@@ -5,14 +5,14 @@ checkout() {
         selected_repo="$1"
         log_message "Repository passed from command: $selected_repo"
     else
-        select_repo --allowNew
+        select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
-        log_message "Repo $selected_repo is not already checked out, seeing if we have it checking the checkedin cache..."
+        log_message "Repo $selected_repo is not already checked out, seeing if we have it in the checkedin cache..."
         
-        if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
+        if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
             #it is not cached, clone it
             log_message "Repository $selected_repo does not exist locally. Cloning..."
             git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
@@ -38,7 +38,7 @@ checkout() {
     git pull >> "$LOG_FILE" 2>&1 || handle_error "Git pull failed for $selected_repo"
 
     # Navigate to the selected repository
-    cd "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to navigate to $selected_repo"
+    cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
     # Get the current user
     CURRENT_USER=$(whoami)

@@ -8,7 +8,7 @@ checkin() {
         log_message "Repository passed from checkout script: $selected_repo"
         cd "$CHECKEDOUT_FOLDER/$selected_repo"
     else
-        select_repo
+        select_repo "Which repository do you want to check in?"
     fi
 
     # Get the current date and the user's name

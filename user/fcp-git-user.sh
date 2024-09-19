@@ -100,20 +100,21 @@ setup() {
 
 # Function to select a repo using AppleScript
 select_repo() {
-    # Default is false, i.e., no "New" option
     local enable_new="false"
+    local folders=("$CHECKEDOUT_FOLDER"/*)
+    local prompt_text="Select an existing repository:" # Default prompt
 
-    # Check if --allowNew flag is passed
+    # Check for passed arguments
     for arg in "$@"; do
         if [ "$arg" == "--allowNew" ]; then
             enable_new="true"
-            break
+        elif [ "$arg" == "--checkedIn" ]; then
+            folders=("$CHECKEDIN_FOLDER"/*)
+        else
+            prompt_text="$arg"  # Set the argument as the custom prompt
         fi
     done
-
-    # List all folders inside the repos directory
-    folders=("$CHECKEDOUT_FOLDER"/*)
-    
+   
     # Check if there are any repositories
     if [ ${#folders[@]} -eq 0 ]; then
         osascript -e 'display dialog "No repositories found in the repos folder." buttons {"OK"} default button "OK"'
@@ -136,7 +137,7 @@ select_repo() {
     fi
 
     # Use AppleScript to display a dialog with the repo options
-    selected_repo=$(osascript -e "choose from list {$repo_list} with prompt \"Select an existing repository:\"")
+    selected_repo=$(osascript -e "choose from list {$repo_list} with prompt \"$prompt_text\"")
 
     # Check if the user selected "New" (only if enabled)
     if [ "$selected_repo" == "false" ]; then
@@ -151,7 +152,7 @@ select_repo() {
     fi
 
     # Navigate to the selected or newly created repository
-    cd "$CHECKEDOUT_FOLDER/$selected_repo" || osascript -e 'display dialog "Failed to navigate to the selected repository." buttons {"OK"} default button "OK"'
+    cd "$CHECKEDOUT_FOLDER/$selected_repo"
 }
 # --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/select_repo.sh ---
 
@@ -168,7 +169,7 @@ checkin() {
         log_message "Repository passed from checkout script: $selected_repo"
         cd "$CHECKEDOUT_FOLDER/$selected_repo"
     else
-        select_repo
+        select_repo "Which repository do you want to check in?"
     fi
 
     # Get the current date and the user's name
@@ -209,14 +210,14 @@ checkout() {
         selected_repo="$1"
         log_message "Repository passed from command: $selected_repo"
     else
-        select_repo --allowNew
+        select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
-        log_message "Repo $selected_repo is not already checked out, seeing if we have it checking the checkedin cache..."
+        log_message "Repo $selected_repo is not already checked out, seeing if we have it in the checkedin cache..."
         
-        if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
+        if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
             #it is not cached, clone it
             log_message "Repository $selected_repo does not exist locally. Cloning..."
             git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
@@ -225,7 +226,7 @@ checkout() {
             # it is cached, copy it to the checked out folder
             log_message "Repository $selected_repo is cached, but not checked out."
             log_message "Making repository $selected_repo writable"
-            chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
             log_message "moving repo to checkedout folder..."
             mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checked out folder"
         fi
@@ -234,7 +235,7 @@ checkout() {
         log_message "Selected repo already checked out: $selected_repo"
     fi
     
-    
+    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
     echo "Repository $selected_repo is now writable."
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
@@ -242,7 +243,7 @@ checkout() {
     git pull >> "$LOG_FILE" 2>&1 || handle_error "Git pull failed for $selected_repo"
 
     # Navigate to the selected repository
-    cd "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to navigate to $selected_repo"
+    cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
     # Get the current user
     CURRENT_USER=$(whoami)

@@ -1,19 +1,20 @@
 # Function to select a repo using AppleScript
 select_repo() {
-    # Default is false, i.e., no "New" option
     local enable_new="false"
+    local folders=("$CHECKEDOUT_FOLDER"/*)
+    local prompt_text="Select an existing repository:" # Default prompt
 
-    # Check if --allowNew flag is passed
+    # Check for passed arguments
     for arg in "$@"; do
         if [ "$arg" == "--allowNew" ]; then
             enable_new="true"
-            break
+        elif [ "$arg" == "--checkedIn" ]; then
+            folders=("$CHECKEDIN_FOLDER"/*)
+        else
+            prompt_text="$arg"  # Set the argument as the custom prompt
         fi
     done
-
-    # List all folders inside the repos directory
-    folders=("$CHECKEDOUT_FOLDER"/*)
-    
+   
     # Check if there are any repositories
     if [ ${#folders[@]} -eq 0 ]; then
         osascript -e 'display dialog "No repositories found in the repos folder." buttons {"OK"} default button "OK"'
@@ -36,7 +37,7 @@ select_repo() {
     fi
 
     # Use AppleScript to display a dialog with the repo options
-    selected_repo=$(osascript -e "choose from list {$repo_list} with prompt \"Select an existing repository:\"")
+    selected_repo=$(osascript -e "choose from list {$repo_list} with prompt \"$prompt_text\"")
 
     # Check if the user selected "New" (only if enabled)
     if [ "$selected_repo" == "false" ]; then
@@ -51,5 +52,5 @@ select_repo() {
     fi
 
     # Navigate to the selected or newly created repository
-    cd "$CHECKEDOUT_FOLDER/$selected_repo" || osascript -e 'display dialog "Failed to navigate to the selected repository." buttons {"OK"} default button "OK"'
+    cd "$CHECKEDOUT_FOLDER/$selected_repo"
 }
