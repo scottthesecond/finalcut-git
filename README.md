@@ -4,7 +4,7 @@ Except, for our use case, this super duper sucks because we only used postlab to
 And then, today, September 17, postlab shat the bed and now I can't even check in on v1 – the check for changes button makes that little ping noise and nothin' works.  Sooooo we're doing this now.  
 
 ## Contents
-- **.gitignore.template**: .gitignore to avoid syncing render files, or aliases to original media.  The big benefit of this is that it will prevent relinking if users aren't working off a central file server.
+- **gitignore-template**: .gitignore to avoid syncing render files, or aliases to original media.  The big benefit of this is that it will prevent relinking if users aren't working off a central file server.
 
 ## Todo
 - [ ] Checkout / Locking mechanism
