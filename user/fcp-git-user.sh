@@ -6,7 +6,9 @@
 
 #Variables
 DATA_FOLDER="$HOME/fcp-git"
-REPO_FOLDER="$DATA_FOLDER/repos"
+#REPO_FOLDER="$DATA_FOLDER/repos"
+CHECKEDOUT_FOLDER="$DATA_FOLDER/checkedout"
+CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
 LOG_FILE="$DATA_FOLDER/fcp-git.log"
 selected_repo=""
@@ -164,7 +166,7 @@ checkin() {
     if [ -n "$1" ]; then
         selected_repo="$1"
         log_message "Repository passed from checkout script: $selected_repo"
-        cd "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to navigate to $selected_repo"
+        cd "$CHECKEDOUT_FOLDER/$selected_repo"
     else
         select_repo
     fi
@@ -181,19 +183,20 @@ checkin() {
     git commit -m "Commit on $current_date by $user_name" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
     log_message "Pushing changes for $selected_repo"
     git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
-
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
     echo "Changes have been checked in and pushed for $selected_repo."
+
+    log_message "moving repo to .checkedin folder..."
+    mv "$CHECKEDOUT_FOLDER/$selected_repo" "$CHECKEDIN_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checkedin folder – make sure you've closed all projects."
+
     osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
 
     # Set the repository to read-only
     log_message "Setting repository $selected_repo to read-only"
-    chmod -R u-w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to set repository $selected_repo to read-only"
+    chmod -R u-w "$CHECKEDIN_FOLDER/$selected_repo" || handle_error "Failed to set repository $selected_repo to read-only"
     log_message "Repository $selected_repo is now read-only"
     echo "Repository $selected_repo is now read-only."
 }
-
-
 # --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/checkin.sh ---
 
 
@@ -211,19 +214,26 @@ checkout() {
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
-        log_message "Repository $selected_repo does not exist locally. Cloning..."
-        git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
-        log_message "Repository cloned: $selected_repo"
-        # osascript -e "display dialog \"New repository cloned: $selected_repo\" buttons {\"OK\"} default button \"OK\""
+        log_message "Repo $selected_repo is not already checked out, seeing if we have it checking the checkedin cache..."
+        
+        if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
+            #it is not cached, clone it
+            log_message "Repository $selected_repo does not exist locally. Cloning..."
+            git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
+            log_message "Repository cloned: $selected_repo"
+        else
+            # it is cached, copy it to the checked out folder
+            log_message "Repository $selected_repo is cached, but not checked out."
+            log_message "Making repository $selected_repo writable"
+            chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+            log_message "moving repo to checkedout folder..."
+            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checked out folder"
+        fi
 
     else
-        log_message "Selected existing repository: $selected_repo"
+        log_message "Selected repo already checked out: $selected_repo"
     fi
     
-    log_message "Making repository $selected_repo writable"
-    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
-
-    log_message "Repository $selected_repo is now writable"
     
     echo "Repository $selected_repo is now writable."
     cd "$CHECKEDOUT_FOLDER/$selected_repo"

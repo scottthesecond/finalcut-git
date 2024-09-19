@@ -21,7 +21,7 @@ checkout() {
             # it is cached, copy it to the checked out folder
             log_message "Repository $selected_repo is cached, but not checked out."
             log_message "Making repository $selected_repo writable"
-            chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
             log_message "moving repo to checkedout folder..."
             mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checked out folder"
         fi
@@ -30,7 +30,7 @@ checkout() {
         log_message "Selected repo already checked out: $selected_repo"
     fi
     
-    
+    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
     echo "Repository $selected_repo is now writable."
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
