@@ -59,6 +59,7 @@ setup() {
 	if command_exists git; then
 		log_message "Git is already installed"
 	else
+		log_message "Git is not installed."
 		echo "Git is not installed. Press enter to install the Xcode Command Line Tools, which will install GIT."
 		echo "For all your options to install GIT, go to https://git-scm.com/download/mac."
 		read -r
@@ -78,17 +79,17 @@ setup() {
 		SSH_KEY_PUB="$SSH_DIR/id_rsa.pub"
 	else
 		# Generate the SSH Key
+		log_message "No SSH public key found. Generating a new SSH key."
 		# echo "No SSH public key found. Generating a new SSH key."
-		echo "I am going to generate a public key to allow you to access the GIT server.  Just a moment..."
-		read -p "Enter your email address: " email
+		#read -p "Enter your email address: " email
+		email=$(osascript -e 'display dialog "I am going to generate a public key to allow you to access the GIT server.  Please enter your email:" default answer ""' -e 'text returned of result')
 		ssh-keygen -t ed25519 -C "$email"
 		SSH_KEY_PUB="$SSH_DIR/id_ed25519.pub"
 	fi
 
 	# Return the SSH public key
 	echo -e "\nYour public key is below.  Please copy the whole thing and give it to your manager:\n"
-	cat "$SSH_KEY_PUB"
-
+	email=$(osascript -e "display dialog \"I am going to generate a public key to allow you to access the GIT server. Please enter your email:\" default answer \"$(cat "$SSH_KEY_PUB")\"" -e 'text returned of result')
 }
 # --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/setup.sh ---
 
