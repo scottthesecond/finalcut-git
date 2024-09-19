@@ -3,8 +3,13 @@
 # Ask for the name of the project
 read -p "Enter the project name: " project_name
 
-# Define the repository path
+# Define the bare repository path
 repo_path="$HOME/repositories/$project_name.git"
+
+# Create the repositories directory if it doesn't exist
+if [ ! -d "$HOME/repositories" ]; then
+  mkdir -p "$HOME/repositories"
+fi
 
 # Check if the repository already exists
 if [ -d "$repo_path" ]; then
@@ -12,21 +17,34 @@ if [ -d "$repo_path" ]; then
   exit 1
 fi
 
-# Create the new repository directory
-mkdir "$repo_path"
-chown "$repo_path"
-cd "$repo_path"
+# Create the bare repository
+git init --bare "$repo_path"
+chown git:git "$repo_path"
 
-# Initialize the git repository
-git init
+# Clone the bare repository into a temporary directory
+temp_dir=$(mktemp -d)
+git clone "$repo_path" "$temp_dir"
 
-# Create FCP .gitignore 
+# Change into the temporary directory
+cd "$temp_dir"
+
+# Create a .gitignore file with the specified content
 cat <<EOL > .gitignore
 **/Render Files
 **/Original Media
 **/Transcoded Media
 EOL
+
+# Add and commit the .gitignore file to the cloned repository
 git add .gitignore
 git commit -m "Add .gitignore file"
 
-echo "Repository '$project_name' created in $repo_path with a .gitignore file."
+# Push the commit back to the bare repository
+git push origin master
+
+# Clean up by removing the temporary directory
+cd ..
+rm -rf "$temp_dir"
+
+# Output success message
+echo "Bare repository '$project_name' created in $repo_path with a .gitignore file."

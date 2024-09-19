@@ -11,9 +11,9 @@ checkout() {
     # Check if the repository exists locally
     if [ ! -d "$REPO_FOLDER/$selected_repo" ]; then
         log_message "Repository $selected_repo does not exist locally. Cloning..."
-        git clone "$REMOTE_SERVER/$selected_repo.git" "$REPO_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $selected_repo"
+        git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$REPO_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
         log_message "Repository cloned: $selected_repo"
-        osascript -e "display dialog \"New repository cloned: $selected_repo\" buttons {\"OK\"} default button \"OK\""
+        # osascript -e "display dialog \"New repository cloned: $selected_repo\" buttons {\"OK\"} default button \"OK\""
 
     else
         log_message "Selected existing repository: $selected_repo"
@@ -25,7 +25,7 @@ checkout() {
     log_message "Repository $selected_repo is now writable"
     
     echo "Repository $selected_repo is now writable."
-    cd "$REPO_FOLDER/$selected_repo" || handle_error "Failed to navigate to $selected_repo"
+    cd "$REPO_FOLDER/$selected_repo"
 
     log_message "Running git pull in $selected_repo"
     git pull >> "$LOG_FILE" 2>&1 || handle_error "Git pull failed for $selected_repo"
