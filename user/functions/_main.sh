@@ -1,5 +1,7 @@
 URL=$1
 
+migration1.3
+
 if [ -z "$URL" ]; then
     # No parameters passed, display AppleScript dialog
     SCRIPT=$(osascript <<EOD

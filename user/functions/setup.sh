@@ -2,6 +2,22 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+migration1.3(){
+
+	# Define the folder path
+	REPOS_PATH="$DATA_FOLDER/repos"
+
+	# Check if the folder exists
+	if [ -d "$REPOS_PATH" ]; then
+	# Rename the folder
+	mv "$REPOS_PATH" "$CHECKEDOUT_FOLDER"
+	log_message "Migration: renamed /repos to /checkedout"
+	mkdir -p "$CHECKEDIN_FOLDER"
+	log_message "Migration: created .checkedin folder"
+	fi
+
+}
+
 setup() {
 	CONFIRM=$(osascript -e 'display dialog "Set up UNFlab?" buttons {"Yes", "No"} default button "Yes"' -e 'button returned of result')
 	if [ "$CONFIRM" == "No" ]; then
@@ -15,6 +31,7 @@ setup() {
 	#Create Folders
 	mkdir -p "$DATA_FOLDER"
 	mkdir -p "$CHECKEDOUT_FOLDER"
+	mkdir -p "$CHECKEDIN_FOLDER"
 
 	# Write the server address and port to the .env file
 	echo "SERVER_ADDRESS=$SERVER_ADDRESS" > "$CONFIG_FILE"
