@@ -83,7 +83,7 @@ setup() {
 		# echo "No SSH public key found. Generating a new SSH key."
 		#read -p "Enter your email address: " email
 		email=$(osascript -e 'display dialog "I am going to generate a public key to allow you to access the GIT server.  Please enter your email:" default answer ""' -e 'text returned of result')
-		ssh-keygen -t ed25519 -C "$email"
+		ssh-keygen -t ed25519 -C "$email" -q -N
 		SSH_KEY_PUB="$SSH_DIR/id_ed25519.pub"
 	fi
 
@@ -258,10 +258,15 @@ checkout() {
     # Open the repository directory
     open "$REPO_FOLDER/$selected_repo"
 
-    # Use AppleScript to inform the user
-    osascript -e "display dialog \"You are now checked out into $selected_repo.  Press OK when you are done making changes, and the changes will be checked in.\" buttons {\"OK\"} default button \"OK\""
+    # Use AppleScript to display two buttons
+    response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
 
-    checkin "$selected_repo"
+    # Check if the user selected 'Check In'
+    if [[ "$response" == "button returned:Check In Now" ]]; then
+        checkin "$selected_repo"
+    else
+        osascript -e "display dialog \"When you're finished editing, launch UNFlab, choose 'Check In', and select $selected_repo.\" buttons {\"OK\"} default button \"OK\""
+    fi
 
 }
 # --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/checkout.sh ---
