@@ -14,7 +14,7 @@ setup() {
 
 	#Create Folders
 	mkdir -p "$DATA_FOLDER"
-	mkdir -p "$REPO_FOLDER"
+	mkdir -p "$CHECKEDOUT_FOLDER"
 
 	# Write the server address and port to the .env file
 	echo "SERVER_ADDRESS=$SERVER_ADDRESS" > "$CONFIG_FILE"

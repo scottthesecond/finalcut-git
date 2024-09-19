@@ -9,53 +9,60 @@ checkout() {
     fi
 
     # Check if the repository exists locally
-    if [ ! -d "$REPO_FOLDER/$selected_repo" ]; then
-        log_message "Repository $selected_repo does not exist locally. Cloning..."
-        git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$REPO_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
-        log_message "Repository cloned: $selected_repo"
-        # osascript -e "display dialog \"New repository cloned: $selected_repo\" buttons {\"OK\"} default button \"OK\""
+    if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
+        log_message "Repo $selected_repo is not already checked out, seeing if we have it checking the checkedin cache..."
+        
+        if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
+            #it is not cached, clone it
+            log_message "Repository $selected_repo does not exist locally. Cloning..."
+            git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
+            log_message "Repository cloned: $selected_repo"
+        else
+            # it is cached, copy it to the checked out folder
+            log_message "Repository $selected_repo is cached, but not checked out."
+            log_message "Making repository $selected_repo writable"
+            chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+            log_message "moving repo to checkedout folder..."
+            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checked out folder"
+        fi
 
     else
-        log_message "Selected existing repository: $selected_repo"
+        log_message "Selected repo already checked out: $selected_repo"
     fi
     
-    log_message "Making repository $selected_repo writable"
-    chmod -R u+w "$REPO_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
-
-    log_message "Repository $selected_repo is now writable"
     
     echo "Repository $selected_repo is now writable."
-    cd "$REPO_FOLDER/$selected_repo"
+    cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
     log_message "Running git pull in $selected_repo"
     git pull >> "$LOG_FILE" 2>&1 || handle_error "Git pull failed for $selected_repo"
 
     # Navigate to the selected repository
-    cd "$REPO_FOLDER/$selected_repo" || handle_error "Failed to navigate to $selected_repo"
+    cd "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to navigate to $selected_repo"
 
     # Get the current user
     CURRENT_USER=$(whoami)
 
     # Check if the repository is already checked out
-    if [ -f "$REPO_FOLDER/$selected_repo/CHECKEDOUT" ]; then
-        checked_out_by=$(cat "$REPO_FOLDER/$selected_repo/CHECKEDOUT")
+    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
+        checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
-            chmod -R u-w "$REPO_FOLDER/$selected_repo"
+            chmod -R u-w "$CHECKEDOUT_FOLDER/$selected_repo"
             log_message "Repository is already checked out by $checked_out_by"
             osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
             exit 1
         fi
     else
         # Create the CHECKEDOUT file with the current user
-        echo "$CURRENT_USER" > "$REPO_FOLDER/$selected_repo/CHECKEDOUT"
-        git add "$REPO_FOLDER/$selected_repo/CHECKEDOUT" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
+        echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
+        git add "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
         git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || handle_error "Failed to commit CHECKEDOUT file."
         git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
 
     # Open the repository directory
-    open "$REPO_FOLDER/$selected_repo"
+    open "$CHECKEDOUT_FOLDER/$selected_repo"
 
     # Use AppleScript to display two buttons
     response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")

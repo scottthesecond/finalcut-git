@@ -12,7 +12,7 @@ select_repo() {
     done
 
     # List all folders inside the repos directory
-    folders=("$REPO_FOLDER"/*)
+    folders=("$CHECKEDOUT_FOLDER"/*)
     
     # Check if there are any repositories
     if [ ${#folders[@]} -eq 0 ]; then
@@ -47,9 +47,9 @@ select_repo() {
         selected_repo=$(osascript -e 'display dialog "Enter the name of the new repository:" default answer ""' -e 'text returned of result')
 
         # Create the new repository folder
-        #mkdir -p "$REPO_FOLDER/$selected_repo"
+        #mkdir -p "$CHECKEDOUT_FOLDER/$selected_repo"
     fi
 
     # Navigate to the selected or newly created repository
-    cd "$REPO_FOLDER/$selected_repo" || osascript -e 'display dialog "Failed to navigate to the selected repository." buttons {"OK"} default button "OK"'
+    cd "$CHECKEDOUT_FOLDER/$selected_repo" || osascript -e 'display dialog "Failed to navigate to the selected repository." buttons {"OK"} default button "OK"'
 }
