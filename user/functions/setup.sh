@@ -49,7 +49,7 @@ setup() {
 		# echo "No SSH public key found. Generating a new SSH key."
 		#read -p "Enter your email address: " email
 		email=$(osascript -e 'display dialog "I am going to generate a public key to allow you to access the GIT server.  Please enter your email:" default answer ""' -e 'text returned of result')
-		ssh-keygen -t ed25519 -C "$email"
+		ssh-keygen -t ed25519 -C "$email" -q -N
 		SSH_KEY_PUB="$SSH_DIR/id_ed25519.pub"
 	fi
 
