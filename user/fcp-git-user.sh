@@ -183,6 +183,7 @@ checkin() {
 
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
     echo "Changes have been checked in and pushed for $selected_repo."
+    osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
 
     # Set the repository to read-only
     log_message "Setting repository $selected_repo to read-only"
