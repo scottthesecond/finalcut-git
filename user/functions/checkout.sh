@@ -47,9 +47,9 @@ checkout() {
     if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
         checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
-            chmod -R u-w "$CHECKEDOUT_FOLDER/$selected_repo"
             log_message "Repository is already checked out by $checked_out_by"
             osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
+            moveToHiddenCheckinFolder
             exit 1
         fi
     else
