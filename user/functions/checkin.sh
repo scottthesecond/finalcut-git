@@ -36,6 +36,7 @@ checkin() {
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
     echo "Changes have been checked in and pushed for $selected_repo."
 
+    moveToHiddenCheckinFolder
 
     osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
 
