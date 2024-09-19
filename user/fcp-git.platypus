@@ -29,7 +29,7 @@
 	<key>IconPath</key>
 	<string>/Applications/Platypus.app/Contents/Resources/PlatypusDefault.icns</string>
 	<key>Identifier</key>
-	<string>org.shoek.FcpgitUser</string>
+	<string>org.shoek.FCPGIT</string>
 	<key>InterfaceType</key>
 	<string>None</string>
 	<key>InterpreterArgs</key>
@@ -37,7 +37,7 @@
 	<key>InterpreterPath</key>
 	<string>/bin/bash</string>
 	<key>Name</key>
-	<string>Fcpgit User</string>
+	<string>FCPGIT</string>
 	<key>NibPath</key>
 	<string>/usr/local/share/platypus/MainMenu.nib</string>
 	<key>OptimizeApplication</key>
@@ -53,7 +53,7 @@
 	<key>ScriptArgs</key>
 	<array/>
 	<key>ScriptPath</key>
-	<string>/Users/shoek/Git Testing/finalcut-git/compiled/fcpgit-user.sh</string>
+	<string>/Users/shoek/Git Testing/finalcut-git/user/fcp-git-user.sh</string>
 	<key>SendNotifications</key>
 	<false/>
 	<key>StatusItemDisplayType</key>

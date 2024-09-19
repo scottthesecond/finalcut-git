@@ -44,7 +44,7 @@ setup() {
 
 	SERVER_ADDRESS=$(osascript -e 'display dialog "Enter server address:" default answer ""' -e 'text returned of result')
 	SERVER_PORT=$(osascript -e 'display dialog "Enter server port:" default answer "22"' -e 'text returned of result')
-	SERVER_PORT=$(osascript -e 'display dialog "Enter server path:" default answer "~/repositories"' -e 'text returned of result')
+	SERVER_PATH=$(osascript -e 'display dialog "Enter server path:" default answer "~/repositories"' -e 'text returned of result')
 
 	#Create Folders
 	mkdir -p "$DATA_FOLDER"
@@ -385,12 +385,18 @@ if [ -z "$URL" ]; then
 EOD
 )
     if [ -z "$SCRIPT" ]; then
+        log_message "No action chosen. Exiting."
         echo "No action chosen. Exiting."
         exit 1
     fi
 else
-    SCRIPT=$(echo "$URL" | cut -d'/' -f1)
-    PARAM=$(echo "$URL" | cut -d'/' -f2)
+log_message "Started with URL: $URL"
+    URLPATH="${URL#*//}"
+    SCRIPT=$(echo "$URLPATH" | cut -d'/' -f1)
+    PARAM=$(echo "$URLPATH" | cut -d'/' -f2)
+    log_message "Script: $SCRIPT"
+    log_message "Param: $PARAM"
+
 fi
 
 if [ "$SCRIPT" == "checkin" ]; then

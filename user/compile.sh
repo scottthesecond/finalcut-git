@@ -18,7 +18,7 @@ scripts=(
 )
 
 # Define output file name
-output_file="$PARENT_DIR/compiled/fcpgit-user.sh"
+output_file="$SCRIPT_DIR/fcp-git-user.sh"
 
 # Start fresh by creating the file and adding the shebang
 echo "#!/bin/bash" > "$output_file"

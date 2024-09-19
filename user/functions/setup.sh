@@ -10,7 +10,7 @@ setup() {
 
 	SERVER_ADDRESS=$(osascript -e 'display dialog "Enter server address:" default answer ""' -e 'text returned of result')
 	SERVER_PORT=$(osascript -e 'display dialog "Enter server port:" default answer "22"' -e 'text returned of result')
-	SERVER_PORT=$(osascript -e 'display dialog "Enter server path:" default answer "~/repositories"' -e 'text returned of result')
+	SERVER_PATH=$(osascript -e 'display dialog "Enter server path:" default answer "~/repositories"' -e 'text returned of result')
 
 	#Create Folders
 	mkdir -p "$DATA_FOLDER"

@@ -12,12 +12,18 @@ if [ -z "$URL" ]; then
 EOD
 )
     if [ -z "$SCRIPT" ]; then
+        log_message "No action chosen. Exiting."
         echo "No action chosen. Exiting."
         exit 1
     fi
 else
-    SCRIPT=$(echo "$URL" | cut -d'/' -f1)
-    PARAM=$(echo "$URL" | cut -d'/' -f2)
+log_message "Started with URL: $URL"
+    URLPATH="${URL#*//}"
+    SCRIPT=$(echo "$URLPATH" | cut -d'/' -f1)
+    PARAM=$(echo "$URLPATH" | cut -d'/' -f2)
+    log_message "Script: $SCRIPT"
+    log_message "Param: $PARAM"
+
 fi
 
 if [ "$SCRIPT" == "checkin" ]; then
