@@ -1,9 +1,6 @@
 #!/bin/bash
 
-# Ask for the name of the project
 read -p "Enter the project name: " project_name
-
-# Define the bare repository path
 repo_path="$HOME/repositories/$project_name.git"
 
 # Create the repositories directory if it doesn't exist
@@ -17,7 +14,7 @@ if [ -d "$repo_path" ]; then
   exit 1
 fi
 
-# Create the bare repository
+# Create the repository
 git init --bare "$repo_path"
 chown git:git "$repo_path"
 
@@ -28,7 +25,7 @@ git clone "$repo_path" "$temp_dir"
 # Change into the temporary directory
 cd "$temp_dir"
 
-# Create a .gitignore file with the specified content
+# Create a .gitignore to ignore final cut things we don't want to sync
 cat <<EOL > .gitignore
 **/Render Files
 **/Original Media
@@ -45,7 +42,7 @@ git commit -m "Add .gitignore file"
 # Push the commit back to the bare repository
 git push origin master
 
-# Clean up by removing the temporary directory
+# Remove temp dir
 cd ..
 rm -rf "$temp_dir"
 
