@@ -3,8 +3,10 @@ Keeps final cut projects in sync across remote editing times.  Includes check-in
 Prevents relinking files when sending projects back-and-forth.
 
 ## Why did I make this
-It was September of 2024.  The team was cranking through wedding videos, when suddenly, P\*\*\*l\*b shat the bed.  We couldn't check things in, we were getting conflicts all the time, about half a dozen projects were borked.  Support said no one was available because the team was "recovering" from some conference.  After telling them that we weren't able to work, they connected us with a "product specialist" who started the call, irritated at having been awoken from his *recovery*, by insulting my business partner to his face and telling him that "some users just need hand-holding" (actual quote).  After being shown the issue, he proceeded to stare at the console, completly stumped, and were unable to fix the issue.   
+It was September of 2024.  The team was cranking through wedding videos, when suddenly, P\*\*\*l\*b shat the bed.  We couldn't check things in, we were getting conflicts all the time, about half a dozen projects were borked.  Support said no one was available because the team was "recovering" from some conference.  After telling them that we weren't able to work, they connected us with a "product specialist" who started the call, irritated at having been awoken from his *rEcOvErY*, by insulting my business partner to his face and telling him that "some users just need hand-holding" (actual quote).  After being shown the issue, he proceeded to stare at the console, completly stumped, and were unable to fix the issue.
+
 Anyway, after deciding that I hate these people (and didn't want to spend $200/license on the upgrade to V2 which doesn't even do the syncing, the entire reason we had for using that product), I made my own knockoff version with bash scripts on a four-hour plane ride while heading home from a shoot.
+
 And so, fcp.git was born (or as we call it at UnnamedFilms, UNFlab).  Hopefully this will be helpful for someone else, too.
 
 ## How it works
