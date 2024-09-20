@@ -7,5 +7,9 @@ And then, today, September 17, postlab shat the bed and now I can't even check i
 - **gitignore-template**: .gitignore to avoid syncing render files, or aliases to original media.  The big benefit of this is that it will prevent relinking if users aren't working off a central file server.
 
 ## Todo
-- [ ] Checkout / Locking mechanism
-- [ ] Script to check for and create a GIT private key for the end-user to report back to manager
+- [ ] Change CHEKCEDOUT to .checkedout
+- [ ] Periodic push?  Automatic checkin after inactivity?
+- [ ] Conflict resolution
+    - [ ]
+- [X] Checkout / Locking mechanism
+- [X] Script to check for and create a GIT private key for the end-user to report back to manager
