@@ -33,6 +33,9 @@ cat <<EOL > .gitignore
 **/Render Files
 **/Original Media
 **/Transcoded Media
+.lock
+.lock-info
+**/.lock-dir
 EOL
 
 # Add and commit the .gitignore file to the cloned repository
