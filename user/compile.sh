@@ -4,6 +4,8 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
+VERSION="1.4"
+NAME="UNFlab"
 
 # Define the array of script paths
 scripts=(
@@ -45,4 +47,23 @@ done
 # Make the combined script executable
 chmod +x "$output_file"
 
-echo "All scripts concatenated into $output_file"
+echo "All scripts concatenated into $output_file."
+
+# Ask the user if they want to continue
+read -p "Build app with Platypus?" choice
+
+# Check the user's input
+if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+    echo "building..."
+    mkdir -p "$SCRIPT_DIR/build"
+
+    OUT_ZIP="$SCRIPT_DIR/build/$NAME $VERSION.zip"
+    OUT_APP="$NAME.app"
+
+    /usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'None'  --interpreter '/bin/bash'  --uniform-type-identifiers 'public.item|public.folder' --uri-schemes 'fcpgit' --quit-after-execution "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
+
+    cd "$SCRIPT_DIR/build"
+    zip -r "$OUT_ZIP" "$OUT_APP"
+
+    echo "done."
+fi

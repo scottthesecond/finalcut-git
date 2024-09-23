@@ -17,11 +17,12 @@ Set up a GIT server to use as your remote.  Then, distribute the fcp-git-user.sh
 If you user the included scripts on the GIT server to set up the repos, it will add a .gitignore file which prevents the syncing of linked media aliases, so users will not have to relink when syncing back-and-forth.
 
 ## Todo
-- [ ] Check if files are open before checking them in.
-- [ ] Some sort of loading indicator when GIT is working – check in and check out can take a minute and there's currently no feedback to show it's working.
+- [ ] Status bar UI for easy access to checked in and out projects?
 - [ ] Guides for setting up GIT server.
 - [ ] Change CHEKCEDOUT to .checkedout
 - [ ] Periodic push?  Automatic checkin after inactivity?
 - [ ] Conflict resolution
+- [X] Check if files are open before checking them in.
+- [X] Some sort of loading indicator when GIT is working – check in and check out can take a minute and there's currently no feedback to show it's working.
 - [X] Checkout / Locking mechanism
 - [X] Script to check for and create a GIT private key for the end-user to report back to manager

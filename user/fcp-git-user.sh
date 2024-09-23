@@ -219,7 +219,7 @@ checkin() {
         fi
     done
 
-    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server." "Hide"
+    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
 
 
     # Get the current date and the user's name
@@ -260,8 +260,7 @@ checkout() {
         select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
-    display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server.  I'll let you know when it's ready to work on." "Hide"
-
+    display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server...." "Hide"
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then

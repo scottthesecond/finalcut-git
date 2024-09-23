@@ -1,3 +1,5 @@
 .env
 builds/
 .DS_store
+**/build
+**/build/
