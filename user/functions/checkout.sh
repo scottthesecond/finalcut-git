@@ -8,6 +8,9 @@ checkout() {
         select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
+    display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server.  I'll let you know when it's ready to work on." "Hide"
+
+
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
         log_message "Repo $selected_repo is not already checked out, seeing if we have it in the checkedin cache..."
@@ -15,7 +18,9 @@ checkout() {
         if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
             #it is not cached, clone it
             log_message "Repository $selected_repo does not exist locally. Cloning..."
+            
             git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
+
             log_message "Repository cloned: $selected_repo"
         else
             # it is cached, copy it to the checked out folder
@@ -47,7 +52,9 @@ checkout() {
     if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
         checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
+            
             log_message "Repository is already checked out by $checked_out_by"
+            hide_dialog
             osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
             moveToHiddenCheckinFolder
             exit 1
@@ -60,18 +67,22 @@ checkout() {
         git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
+    
+    hide_dialog
 
     # Open the repository directory
     open "$CHECKEDOUT_FOLDER/$selected_repo"
 
+    display_notification "$selected_repo is ready." "The project is checked out and ready to work on." "When you're done, launch UNFlab and select \"checkin\", then $selected_repo"
+
     # Use AppleScript to display two buttons
-    response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
+    #response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
 
     # Check if the user selected 'Check In'
-    if [[ "$response" == "button returned:Check In Now" ]]; then
-        checkin "$selected_repo"
-    else
-        osascript -e "display dialog \"When you're finished editing, launch UNFlab, choose 'Check In', and select $selected_repo.\" buttons {\"OK\"} default button \"OK\""
-    fi
+    #if [[ "$response" == "button returned:Check In Now" ]]; then
+    #    checkin "$selected_repo"
+    #else
+    #    osascript -e "display dialog \"When you're finished editing, launch UNFlab, choose 'Check In', and select $selected_repo.\" buttons {\"OK\"} default button \"OK\""
+    #fi
 
 }

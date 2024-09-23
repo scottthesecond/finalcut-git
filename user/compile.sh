@@ -14,6 +14,7 @@ scripts=(
     "$FUNCTIONS/checkin.sh"
     "$FUNCTIONS/checkout.sh"
     "$FUNCTIONS/config.sh"
+    "$FUNCTIONS/dialogs.sh"
     "$FUNCTIONS/_main.sh"
 )
 
@@ -29,13 +30,13 @@ for script in "${scripts[@]}"; do
         echo "Concatenating $script into $output_file..."
         
         # Add a comment in the output file to indicate the start of a new script
-        echo -e "\n# --- Start of $script ---\n" >> "$output_file"
+        #echo -e "\n# --- Start of $script ---\n" >> "$output_file"
         
         # Append the content of the script to the output file
         cat "$script" >> "$output_file"
         
         # Add a comment to indicate the end of the script
-        echo -e "\n# --- End of $script ---\n" >> "$output_file"
+        #echo -e "\n# --- End of $script ---\n" >> "$output_file"
     else
         echo "Warning: $script not found, skipping..."
     fi

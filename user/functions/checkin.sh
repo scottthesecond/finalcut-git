@@ -60,6 +60,8 @@ checkin() {
         fi
     done
 
+    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server." "Hide"
+
 
     # Get the current date and the user's name
     current_date=$(date +"%Y-%m-%d")
@@ -78,8 +80,13 @@ checkin() {
 
     moveToHiddenCheckinFolder
 
-    osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
+    hide_dialog
+
+    display_notification "Uploaded changes to $selected_repo." "$selected_repo has been sucessfully checked in."
+
+
+#    osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
 
     # Set the repository to read-only
-    echo "Repository $selected_repo is now read-only."
+    #echo "Repository $selected_repo is now read-only."
 }
