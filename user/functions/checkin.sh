@@ -60,7 +60,7 @@ checkin() {
         fi
     done
 
-    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server." "Hide"
+    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
 
 
     # Get the current date and the user's name

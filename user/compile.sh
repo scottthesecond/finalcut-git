@@ -34,7 +34,7 @@ for script in "${scripts[@]}"; do
         
         # Append the content of the script to the output file
         cat "$script" >> "$output_file"
-        
+        echo -e "\n" >> "$output_file"
         # Add a comment to indicate the end of the script
         #echo -e "\n# --- End of $script ---\n" >> "$output_file"
     else

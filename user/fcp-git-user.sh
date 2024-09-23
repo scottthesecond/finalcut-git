@@ -1,7 +1,4 @@
 #!/bin/bash
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/vars.sh ---
-
 #!/bin/bash
 
 #Variables
@@ -12,10 +9,6 @@ CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
 LOG_FILE="$DATA_FOLDER/fcp-git.log"
 selected_repo=""
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/vars.sh ---
-
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/logs.sh ---
 
 # Function to log messages
 log_message() {
@@ -29,10 +22,6 @@ handle_error() {
     osascript -e "display dialog \"Error: $1.  See log for details.\" buttons {\"OK\"} default button \"OK\""
     exit 1
 }
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/logs.sh ---
-
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/setup.sh ---
 
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -110,10 +99,6 @@ setup() {
 	echo -e "\:\n"
 	email=$(osascript -e "display dialog \"nYour public key is below.  Please copy the whole thing and give it to your manager:\" default answer \"$(cat "$SSH_KEY_PUB")\"" -e 'text returned of result')
 }
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/setup.sh ---
-
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/select_repo.sh ---
 
 # Function to select a repo using AppleScript
 select_repo() {
@@ -171,10 +156,6 @@ select_repo() {
     # Navigate to the selected or newly created repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 }
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/select_repo.sh ---
-
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/checkin.sh ---
 
 #!/bin/bash
 
@@ -238,6 +219,8 @@ checkin() {
         fi
     done
 
+    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server." "Hide"
+
 
     # Get the current date and the user's name
     current_date=$(date +"%Y-%m-%d")
@@ -256,15 +239,16 @@ checkin() {
 
     moveToHiddenCheckinFolder
 
-    osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
+    hide_dialog
+
+    display_notification "Uploaded changes to $selected_repo." "$selected_repo has been sucessfully checked in."
+
+
+#    osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
 
     # Set the repository to read-only
-    echo "Repository $selected_repo is now read-only."
+    #echo "Repository $selected_repo is now read-only."
 }
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/checkin.sh ---
-
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/checkout.sh ---
 
 
 checkout() {
@@ -276,6 +260,9 @@ checkout() {
         select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
+    display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server.  I'll let you know when it's ready to work on." "Hide"
+
+
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
         log_message "Repo $selected_repo is not already checked out, seeing if we have it in the checkedin cache..."
@@ -283,7 +270,9 @@ checkout() {
         if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
             #it is not cached, clone it
             log_message "Repository $selected_repo does not exist locally. Cloning..."
+            
             git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
+
             log_message "Repository cloned: $selected_repo"
         else
             # it is cached, copy it to the checked out folder
@@ -315,7 +304,9 @@ checkout() {
     if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
         checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
+            
             log_message "Repository is already checked out by $checked_out_by"
+            hide_dialog
             osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
             moveToHiddenCheckinFolder
             exit 1
@@ -328,25 +319,25 @@ checkout() {
         git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
+    
+    hide_dialog
 
     # Open the repository directory
     open "$CHECKEDOUT_FOLDER/$selected_repo"
 
+    display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
+
     # Use AppleScript to display two buttons
-    response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
+    #response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
 
     # Check if the user selected 'Check In'
-    if [[ "$response" == "button returned:Check In Now" ]]; then
-        checkin "$selected_repo"
-    else
-        osascript -e "display dialog \"When you're finished editing, launch UNFlab, choose 'Check In', and select $selected_repo.\" buttons {\"OK\"} default button \"OK\""
-    fi
+    #if [[ "$response" == "button returned:Check In Now" ]]; then
+    #    checkin "$selected_repo"
+    #else
+    #    osascript -e "display dialog \"When you're finished editing, launch UNFlab, choose 'Check In', and select $selected_repo.\" buttons {\"OK\"} default button \"OK\""
+    #fi
 
 }
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/checkout.sh ---
-
-
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/config.sh ---
 
 # Load the .config file (for server and port if needed)
 if [ -f "$CONFIG_FILE" ]; then
@@ -356,10 +347,45 @@ else
     # echo ".config file not found in $CONFIG_FILE!"
     # exit 1
 fi
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/config.sh ---
+
+# Function to display dialog and store its process ID
+display_dialog_timed() {
+  local TITLE="$1"
+  local DIALOG_TEXT="$2"
+  local DISMISS_TEXT="$3"
+
+  # Run AppleScript in the background
+  osascript <<EOF &
+set dialogTimeout to 60
+set theDialog to display dialog "$DIALOG_TEXT" buttons {"$DISMISS_TEXT"} default button 1 with title "$TITLE" giving up after dialogTimeout
+EOF
+
+  # Store the background process ID
+  DIALOG_PID=$!
+}
+
+# Function to hide (kill) the dialog
+hide_dialog() {
+  if [[ -n "$DIALOG_PID" ]]; then
+    kill "$DIALOG_PID" &> /dev/null
+    echo "Dialog with PID $DIALOG_PID has been hidden."
+  else
+    echo "No dialog is currently active."
+  fi
+}
 
 
-# --- Start of /Users/shoek/Git Testing/finalcut-git/user/functions/_main.sh ---
+# Function to display a macOS notification
+display_notification() {
+  local TITLE="$1"
+  local MESSAGE="$2"
+  local SUBTITLE="$3"
+
+  osascript <<EOF
+display notification "$MESSAGE" with title "$TITLE" subtitle "$SUBTITLE"
+EOF
+}
+
 
 URL=$1
 
@@ -398,5 +424,4 @@ elif [ "$SCRIPT" == "checkout" ]; then
 elif [ "$SCRIPT" == "setup" ]; then
     setup "$PARAM"
 fi
-# --- End of /Users/shoek/Git Testing/finalcut-git/user/functions/_main.sh ---
 
