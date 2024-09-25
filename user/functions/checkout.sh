@@ -65,11 +65,13 @@ checkout() {
             moveToHiddenCheckinFolder
             exit 1
         fi
-        
+
     else
         # Create the .CHECKEDOUT file with the current user
-        
         echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+
+        #In case I can't update everyone at the same time, let's create the old checkedout file too:
+        echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
 
         git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
         git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || handle_error "Failed to commit CHECKEDOUT file."
