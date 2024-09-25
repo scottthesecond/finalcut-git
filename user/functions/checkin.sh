@@ -67,9 +67,12 @@ checkin() {
     current_date=$(date +"%Y-%m-%d")
     user_name=$(whoami)
 
+    # Remove checkedout files
+    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" #V1 CHECKEDOUT File (remove once everyone is up-to-date)
+    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" #V2 .CHECKEDOUT File
+
     # Stage all changes, commit with the current date and username, and push
     log_message "Staging changes in $selected_repo"
-    rm "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" 
     git add . >> "$LOG_FILE" 2>&1 || handle_error "Failed to stage changes in $selected_repo"
     log_message "Committing changes in $selected_repo"
     git commit -m "Commit on $current_date by $user_name" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
