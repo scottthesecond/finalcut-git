@@ -1,6 +1,12 @@
 #!/bin/bash
 
-read -p "Enter the project name: " project_name
+if [ -z "$1" ]; then
+  # If no argument is provided, prompt the user
+  read -p "Enter the project name: " project_name
+else
+  project_name="$1"
+fi
+
 repo_path="$HOME/repositories/$project_name.git"
 
 # Create the repositories directory if it doesn't exist
