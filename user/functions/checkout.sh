@@ -55,20 +55,27 @@ checkout() {
             checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
         elif [ -f "$CHECKEDOUT_FILE"]
             checked_out_by=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+            commit_message=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
         fi
 
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
             
             log_message "Repository is already checked out by $checked_out_by"
             hide_dialog
-            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
+            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
             moveToHiddenCheckinFolder
             exit 1
         fi
 
     else
+
+        #Get the commit message
+        commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
+
+
         # Create the .CHECKEDOUT file with the current user
         echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+        echo "commit_message=$commit_message" > "$CHECKEDOUT_FILE"
 
         #In case I can't update everyone at the same time, let's create the old checkedout file too:
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
