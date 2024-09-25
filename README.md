@@ -20,6 +20,7 @@ If you user the included scripts on the GIT server to set up the repos, it will 
 - [ ] Status bar UI for easy access to checked in and out projects?
 - [ ] Guides for setting up GIT server.
 - [ ] Change CHEKCEDOUT to .checkedout
+- [ ] Commit Messages
 - [ ] Periodic push?  Automatic checkin after inactivity?
 - [ ] Conflict resolution
 - [X] Check if files are open before checking them in.
