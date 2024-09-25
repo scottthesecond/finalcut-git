@@ -44,12 +44,19 @@ checkout() {
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
     # Get the current user
     CURRENT_USER=$(whoami)
 
     # Check if the repository is already checked out
-    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
-        checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
+    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ] || [ -f "$CHECKEDOUT_FILE" ]; then
+        if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
+            checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
+        elif [ -f "$CHECKEDOUT_FILE"]
+            checked_out_by=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+        fi
+
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
             
             log_message "Repository is already checked out by $checked_out_by"
@@ -58,10 +65,13 @@ checkout() {
             moveToHiddenCheckinFolder
             exit 1
         fi
+        
     else
-        # Create the CHECKEDOUT file with the current user
-        echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
-        git add "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
+        # Create the .CHECKEDOUT file with the current user
+        
+        echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+
+        git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
         git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || handle_error "Failed to commit CHECKEDOUT file."
         git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"

@@ -29,7 +29,7 @@ cd "$temp_dir"
 cat <<EOL > .gitignore
 **/Render Files
 **/Original Media
-**/Transcoded Media
+**/Transcoded Media.
 .lock
 .lock-info
 **/.lock-dir
