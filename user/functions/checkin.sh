@@ -67,6 +67,16 @@ checkin() {
     current_date=$(date +"%Y-%m-%d")
     user_name=$(whoami)
 
+    #Get Commit Message
+    commit_message_user=""
+    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+    
+    if [ -z "$commit_message_user" ]; then
+        commit_message="Commit on $current_date by $user_name"
+    else
+        commit_message="$user_name: $commit_message"
+    fi
+
     # Remove checkedout files
     rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" #V1 CHECKEDOUT File (remove once everyone is up-to-date)
     rm -f "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" #V2 .CHECKEDOUT File
@@ -75,11 +85,10 @@ checkin() {
     log_message "Staging changes in $selected_repo"
     git add . >> "$LOG_FILE" 2>&1 || handle_error "Failed to stage changes in $selected_repo"
     log_message "Committing changes in $selected_repo"
-    git commit -m "Commit on $current_date by $user_name" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
+    git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
     log_message "Pushing changes for $selected_repo"
     git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
-    echo "Changes have been checked in and pushed for $selected_repo."
 
     moveToHiddenCheckinFolder
 

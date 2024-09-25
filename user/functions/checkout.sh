@@ -55,7 +55,7 @@ checkout() {
             checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
         elif [ -f "$CHECKEDOUT_FILE"]
             checked_out_by=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-            commit_message=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+            commit_message=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
         fi
 
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
