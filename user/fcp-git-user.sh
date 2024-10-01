@@ -226,16 +226,28 @@ checkin() {
     current_date=$(date +"%Y-%m-%d")
     user_name=$(whoami)
 
+    #Get Commit Message
+    commit_message_user=""
+    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+    
+    if [ -z "$commit_message_user" ]; then
+        commit_message="Commit on $current_date by $user_name"
+    else
+        commit_message="$user_name: $commit_message"
+    fi
+
+    # Remove checkedout files
+    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" #V1 CHECKEDOUT File (remove once everyone is up-to-date)
+    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" #V2 .CHECKEDOUT File
+
     # Stage all changes, commit with the current date and username, and push
     log_message "Staging changes in $selected_repo"
-    rm "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" 
     git add . >> "$LOG_FILE" 2>&1 || handle_error "Failed to stage changes in $selected_repo"
     log_message "Committing changes in $selected_repo"
-    git commit -m "Commit on $current_date by $user_name" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
+    git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
     log_message "Pushing changes for $selected_repo"
     git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
-    echo "Changes have been checked in and pushed for $selected_repo."
 
     moveToHiddenCheckinFolder
 
@@ -296,24 +308,43 @@ checkout() {
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
     # Get the current user
     CURRENT_USER=$(whoami)
 
     # Check if the repository is already checked out
-    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
-        checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
+    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ] || [ -f "$CHECKEDOUT_FILE" ]; then
+        if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
+            checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
+        elif [ -f "$CHECKEDOUT_FILE" ]; then
+            checked_out_by=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+            commit_message=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+        fi
+
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
             
             log_message "Repository is already checked out by $checked_out_by"
             hide_dialog
-            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
+            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
             moveToHiddenCheckinFolder
             exit 1
         fi
+
     else
-        # Create the CHECKEDOUT file with the current user
+
+        #Get the commit message
+        commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
+
+
+        # Create the .CHECKEDOUT file with the current user
+        echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+        echo "commit_message=$commit_message" > "$CHECKEDOUT_FILE"
+
+        #In case I can't update everyone at the same time, let's create the old checkedout file too:
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
-        git add "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
+
+        git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
         git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || handle_error "Failed to commit CHECKEDOUT file."
         git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
@@ -386,41 +417,97 @@ EOF
 }
 
 
-URL=$1
+INPUT=$1
+NAVBAR_MODE=false
+SCRIPT=""
+PARAM=""
 
 migration1.3
+log_message "Script started with arguments: $@"
 
-if [ -z "$URL" ]; then
-    # No parameters passed, display AppleScript dialog
-    SCRIPT=$(osascript <<EOD
-    set userChoice to choose from list {"checkin", "checkout", "setup"} with prompt "Choose an action:"
-    if userChoice is false then
-        return ""
+# Check if -navbar is present in the arguments
+for arg in "$@"; do
+    if [ "$arg" == "-navbar" ]; then
+        NAVBAR_MODE=true
+        log_message "Found -navbar argument"
     else
-        return item 1 of userChoice
-    end if
-EOD
-)
-    if [ -z "$SCRIPT" ]; then
-        log_message "No action chosen. Exiting."
-        echo "No action chosen. Exiting."
-        exit 1
+        INPUT="$arg"  # Assume other arguments are input
+        log_message "Processing argument: $INPUT"
+    fi
+done
+
+
+log_message "Navbar mode: $NAVBAR_MODE"
+
+if $NAVBAR_MODE; then
+    log_message "Running in navbar mode"
+    if [[ -z "$INPUT" || "$INPUT" == "-navbar" ]]; then
+        # Navbar mode with no specific script input; display menu options
+        echo "checkin"
+        echo "checkout"
+        echo "setup"
+        echo "more"  # For testing...
+        log_message "Displayed menu options: checkin, checkout, setup"
+        exit 0
+    else
+        # Script is selected from navbar menu, process input as script action
+        SCRIPT="$INPUT"
+        log_message "Selected script from navbar: $SCRIPT"
     fi
 else
-log_message "Started with URL: $URL"
-    URLPATH="${URL#*//}"
-    SCRIPT=$(echo "$URLPATH" | cut -d'/' -f1)
-    PARAM=$(echo "$URLPATH" | cut -d'/' -f2)
-    log_message "Script: $SCRIPT"
-    log_message "Param: $PARAM"
-
+    log_message "Not in navbar mode, processing normally"
+    # Handle URL or prompt-based input
+    if [[ -z "$INPUT" ]]; then
+        log_message "No input provided, prompting user with AppleScript"
+        # No parameters passed, display AppleScript dialog
+        SCRIPT=$(osascript <<EOD
+        set userChoice to choose from list {"checkin", "checkout", "setup"} with prompt "Choose an action:"
+        if userChoice is false then
+            return ""
+        else
+            return item 1 of userChoice
+        end if
+EOD
+)
+        log_message "User selected: $SCRIPT"
+        if [ -z "$SCRIPT" ]; then
+            log_message "No action chosen. Exiting."
+            echo "No action chosen. Exiting."
+            exit 1
+        fi
+    elif [[ "$INPUT" == *"://"* ]]; then
+        # Input is a URL, process accordingly
+        log_message "Input is a URL: $INPUT"
+        URLPATH="${INPUT#*//}"
+        SCRIPT=$(echo "$URLPATH" | cut -d'/' -f1)
+        PARAM=$(echo "$URLPATH" | cut -d'/' -f2)
+        log_message "Script: $SCRIPT"
+        log_message "Param: $PARAM"
+    fi
 fi
 
+log_message "Final script: $SCRIPT"
+log_message "Final param: $PARAM"
+
+# Execute based on the chosen script action
 if [ "$SCRIPT" == "checkin" ]; then
+    log_message "Executing checkin with param: $PARAM"
     checkin "$PARAM"
 elif [ "$SCRIPT" == "checkout" ]; then
+    log_message "Executing checkout with param: $PARAM"
     checkout "$PARAM"
 elif [ "$SCRIPT" == "setup" ]; then
+    log_message "Executing setup with param: $PARAM"
     setup "$PARAM"
+elif [ "$SCRIPT" == "more" ]; then
+    log_message "Selected 'more' option, displaying sub-options"
+    echo "suboption1"
+    echo "suboption2"
+    echo "suboption3"
+    log_message "Displayed sub-options: suboption1, suboption2, suboption3"
+    exit 0
+else
+    log_message "No valid script action found. Exiting."
+    echo "Invalid action. Exiting."
 fi
 
