@@ -1,4 +1,14 @@
 
+set_log_message() {
+
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+    CURRENT_USER=$(whoami)
+
+    echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+    echo "commit_message=$commit_message" >> "$CHECKEDOUT_FILE"
+
+}
+
 checkout() {
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
@@ -44,10 +54,6 @@ checkout() {
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
-    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
-
-    # Get the current user
-    CURRENT_USER=$(whoami)
 
     # Check if the repository is already checked out
     if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ] || [ -f "$CHECKEDOUT_FILE" ]; then
@@ -72,10 +78,7 @@ checkout() {
         #Get the commit message
         commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
 
-
-        # Create the .CHECKEDOUT file with the current user
-        echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
-        echo "commit_message=$commit_message" > "$CHECKEDOUT_FILE"
+        set_log_message
 
         #In case I can't update everyone at the same time, let's create the old checkedout file too:
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"

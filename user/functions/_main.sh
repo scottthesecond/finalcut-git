@@ -22,9 +22,13 @@ while [[ "$1" != "" ]]; do
     fcpgit://*)
       parse_url "$1"
       ;;
-    "Check In "*)
+    " ↳ Quick Save "*)
+      script="checkpoint"
+      parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
+      ;;
+    " ↳ Check In "*)
       script="checkin"
-      parameter=$(echo "$1" | sed 's/Check In //')
+      parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
     "Check Out Another Project")
       script="checkout"
@@ -32,6 +36,11 @@ while [[ "$1" != "" ]]; do
     " ↳ Go To "*)
       script="open"
       parameter=$(echo "$1" | sed 's/ ↳ Go To //')
+      ;;
+    \"*\")
+      # Remove the surrounding quotes from the project name
+      script="open"
+      parameter=$(echo "$1" | tr -d '"')
       ;;
     *)
       if [ -z "$script" ]; then
@@ -60,6 +69,9 @@ if [ -n "$script" ]; then
     "checkout")
       checkout "$parameter"
       ;;
+    "checkpoint")
+      checkpoint "$parameter"
+      ;;
     "setup")
       setup "$parameter"
       ;;
@@ -85,8 +97,10 @@ if $NAVBAR_MODE; then
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
             # Output action and folder name together
-            echo "Check In \"$folder_name\""
-            echo " ↳ Go To \"$folder_name\""
+            echo "\"$folder_name\""
+            echo " ↳ Check In \"$folder_name\""
+            #echo " ↳ Go To \"$folder_name\""
+            echo " ↳ Quick Save \"$folder_name\""
 
         done
     fi

@@ -43,6 +43,16 @@ migration1.3(){
 
 }
 
+#migration2.0(){
+	
+	#TODO: check previous version, show dialog if they weren't on V2 before to let them know UNFLab now lives in the status bar. 
+	
+	#TODO: Add UNFLab to startup items
+
+	#TODO: Add periodic checkin to cron job maybe?
+
+#}
+
 setup() {
 	CONFIRM=$(osascript -e 'display dialog "Set up UNFlab?" buttons {"Yes", "No"} default button "Yes"' -e 'button returned of result')
 	if [ "$CONFIRM" == "No" ]; then
@@ -186,6 +196,103 @@ moveToHiddenCheckinFolder(){
 
 }
 
+
+commitAndPush() {
+
+    # Get the current date and the user's name
+    current_date=$(date +"%Y-%m-%d")
+    user_name=$(whoami)
+
+    #Get Commit Message
+    commit_message_user=""
+    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+    
+    if [ -z "$commit_message_user" ]; then
+        commit_message="Commit on $current_date by $user_name"
+    else
+        commit_message="$user_name: $commit_message"
+    fi
+
+
+    # Stage all changes, commit with the current date and username, and push
+    log_message "Staging changes in $selected_repo"
+    git add . >> "$LOG_FILE" 2>&1 || handle_error "Failed to stage changes in $selected_repo"
+    log_message "Committing changes in $selected_repo"
+    git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
+    log_message "Pushing changes for $selected_repo"
+    git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
+    log_message "Changes have been successfully checked in and pushed for $selected_repo."
+
+}
+
+
+checkpoint() {
+
+    # Check if the repository is passed as an argument
+    if [ -n "$1" ]; then
+        selected_repo="$1"
+        cd "$CHECKEDOUT_FOLDER/$selected_repo"
+    else
+        select_repo "Which repository do you want to Checkpoint?"
+    fi
+
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+    
+    commit_message_user=""
+    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+
+    log_message "Current commit message: $commit_message_user"
+
+    result=$(osascript -e "display dialog \"What did you change so far?\nI'll sync the project to the server (It'll stay checked out) with the log message below.\n\nIf you'll be working on something different going forward and would like to change your log message for autosaves after this, use Checkpoint w/ New Log Message.\" default answer \"$commit_message_user\" with title \"New Checkpoint\" buttons {\"Cancel\", \"Checkpoint\", \"Checkpoint and Change Message\"} default button \"Checkpoint\"")
+    
+    log_message "Dialog Result: $result"
+    
+        # Parse button clicked and commit message using sed
+        button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
+        commit_message=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
+
+        # Log the parsed values for debugging
+        log_message "Button clicked: $button_clicked"
+        log_message "Commit message: $commit_message"
+
+    set_log_message
+    
+    if [ "$button_clicked" = "Checkpoint" ]; then
+
+        display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
+        commitAndPush
+        display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
+        hide_dialog
+
+        # Code to execute when confirmed
+        log_message "Confirmed with message: $commit_message"
+        # Add your logic here for when the user confirms
+    elif [ "$button_clicked" = "CheckpointandChangeMessage" ]; then
+        
+        nextResult=$(osascript -e "display dialog \"What are you working on now?\n\nI'll use this for autosaves going forward\" default answer \"$commit_message_user\" with title \"Checkpoint Message\" buttons {\"OK\"} default button \"OK\"")
+
+        display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
+        commitAndPush
+        
+        commit_message=$(echo "$nextResult" | awk -F: '/text returned/ {print $2}' | tr -d ', ')
+        set_log_message
+
+        display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
+        hide_dialog
+
+        log_message "Checkpoint Created and message changed to: $commit_message"
+
+    else
+        # Code to execute when canceled
+        log_message "User canceled"
+        # Add your logic here for when the user cancels
+    fi
+
+
+
+}
+
+
 checkin() {
 
     # Check if the repository is passed as an argument
@@ -221,33 +328,11 @@ checkin() {
 
     display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
 
-
-    # Get the current date and the user's name
-    current_date=$(date +"%Y-%m-%d")
-    user_name=$(whoami)
-
-    #Get Commit Message
-    commit_message_user=""
-    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-    
-    if [ -z "$commit_message_user" ]; then
-        commit_message="Commit on $current_date by $user_name"
-    else
-        commit_message="$user_name: $commit_message"
-    fi
-
     # Remove checkedout files
     rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" #V1 CHECKEDOUT File (remove once everyone is up-to-date)
     rm -f "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" #V2 .CHECKEDOUT File
 
-    # Stage all changes, commit with the current date and username, and push
-    log_message "Staging changes in $selected_repo"
-    git add . >> "$LOG_FILE" 2>&1 || handle_error "Failed to stage changes in $selected_repo"
-    log_message "Committing changes in $selected_repo"
-    git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
-    log_message "Pushing changes for $selected_repo"
-    git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
-    log_message "Changes have been successfully checked in and pushed for $selected_repo."
+    commitAndPush
 
     moveToHiddenCheckinFolder
 
@@ -262,6 +347,18 @@ checkin() {
     #echo "Repository $selected_repo is now read-only."
 }
 
+
+
+
+set_log_message() {
+
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+    CURRENT_USER=$(whoami)
+
+    echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+    echo "commit_message=$commit_message" >> "$CHECKEDOUT_FILE"
+
+}
 
 checkout() {
     # Check if the repository is passed as an argument
@@ -308,10 +405,6 @@ checkout() {
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
-    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
-
-    # Get the current user
-    CURRENT_USER=$(whoami)
 
     # Check if the repository is already checked out
     if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ] || [ -f "$CHECKEDOUT_FILE" ]; then
@@ -336,10 +429,7 @@ checkout() {
         #Get the commit message
         commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
 
-
-        # Create the .CHECKEDOUT file with the current user
-        echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
-        echo "commit_message=$commit_message" > "$CHECKEDOUT_FILE"
+        set_log_message
 
         #In case I can't update everyone at the same time, let's create the old checkedout file too:
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
@@ -441,9 +531,13 @@ while [[ "$1" != "" ]]; do
     fcpgit://*)
       parse_url "$1"
       ;;
-    "Check In "*)
+    " ↳ Quick Save "*)
+      script="checkpoint"
+      parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
+      ;;
+    " ↳ Check In "*)
       script="checkin"
-      parameter=$(echo "$1" | sed 's/Check In //')
+      parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
     "Check Out Another Project")
       script="checkout"
@@ -451,6 +545,11 @@ while [[ "$1" != "" ]]; do
     " ↳ Go To "*)
       script="open"
       parameter=$(echo "$1" | sed 's/ ↳ Go To //')
+      ;;
+    \"*\")
+      # Remove the surrounding quotes from the project name
+      script="open"
+      parameter=$(echo "$1" | tr -d '"')
       ;;
     *)
       if [ -z "$script" ]; then
@@ -479,6 +578,9 @@ if [ -n "$script" ]; then
     "checkout")
       checkout "$parameter"
       ;;
+    "checkpoint")
+      checkpoint "$parameter"
+      ;;
     "setup")
       setup "$parameter"
       ;;
@@ -504,8 +606,10 @@ if $NAVBAR_MODE; then
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
             # Output action and folder name together
-            echo "Check In \"$folder_name\""
-            echo " ↳ Go To \"$folder_name\""
+            echo "\"$folder_name\""
+            echo " ↳ Check In \"$folder_name\""
+            #echo " ↳ Go To \"$folder_name\""
+            echo " ↳ Quick Save \"$folder_name\""
 
         done
     fi
