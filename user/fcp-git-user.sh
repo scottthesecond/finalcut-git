@@ -237,7 +237,7 @@ checkpoint() {
     fi
 
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
-    
+
     commit_message_user=""
     commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
 
@@ -269,12 +269,12 @@ checkpoint() {
         # Add your logic here for when the user confirms
     elif [ "$button_clicked" = "CheckpointandChangeMessage" ]; then
         
-        nextResult=$(osascript -e "display dialog \"What are you working on now?\n\nI'll use this for autosaves going forward\" default answer \"$commit_message_user\" with title \"Checkpoint Message\" buttons {\"OK\"} default button \"OK\"")
+        nextResult=$(osascript -e "display dialog \"What are you working on now?\n\nI'll use this for autosaves going forward\" default answer \"$commit_message\" with title \"Checkpoint Message\" buttons {\"OK\"} default button \"OK\"")
 
         display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
         commitAndPush
         
-        commit_message=$(echo "$nextResult" | awk -F: '/text returned/ {print $2}' | tr -d ', ')
+        commit_message=$(echo "$nextResult" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
         set_log_message
 
         display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
