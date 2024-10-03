@@ -1,7 +1,11 @@
 
-set_log_message() {
-
+set_checkedout_file() {
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
+}
+
+set_log_message() {
+    set_checkedout_file
     CURRENT_USER=$(whoami)
 
     echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
@@ -32,6 +36,8 @@ checkout() {
     fi
 
     display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server...." "Hide"
+
+    set_checkedout_file
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
