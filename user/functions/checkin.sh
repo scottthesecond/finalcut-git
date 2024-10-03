@@ -188,11 +188,12 @@ checkin() {
         log_message "Warned user about open files in repository:"
         log_message "$open_files_short"
 
-        user_choice=$(osascript -e "display dialog \"There are files in this repository that are still open in other applications.  Please make sure everything is closed before checking in.\n\nYou can check the log to see which applications are using files in the repository.\" buttons {\"Check-in Anyway (This is a bad idea)\", \"I've Closed Them\"} default button \"I've Closed Them\"")
-
         if [[ "$user_choice" == "button returned:Check-in Anyway (This is a bad idea)" ]]; then
             log_message "User chose to proceed with check-in despite open files."
             break  # Proceed with check-in
+        elif [[ "$user_choice" == "button returned:Cancel" ]]; then
+            log_message "User canceled the check-in process."
+            exit 0  # Abort the current function
         fi
     done
 
