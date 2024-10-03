@@ -308,16 +308,10 @@ checkin() {
     while check_open_files; do
         open_files=$(lsof +D "$CHECKEDOUT_FOLDER/$selected_repo" | awk '{print $1, $9}' | grep -v "^COMMAND")
 
-        # Limit the size of the message passed to osascript
         open_files_short=$(echo "$open_files" | head -n 10)  # Show only the first 10 entries
         log_message "Warned user about open files in repository:"
         log_message "$open_files_short"
 
-        # Escape the open files list for AppleScript
-        # escaped_open_files=$(escape_for_applescript "$open_files_short")
-
-        # Show dialog to user listing the open files
-        #user_choice=$(osascript -e "display dialog \"The following files are open in other applications (showing up to 10):\n\n$escaped_open_files\n\nPlease close these files or choose to check in anyway.\" buttons {\"Check-in Anyway\", \"I've Closed Them\"} default button \"I've Closed Them\"")
         user_choice=$(osascript -e "display dialog \"There are files in this repository that are still open in other applications.  Please make sure everything is closed before checking in.\n\nYou can check the log to see which applications are using files in the repository.\" buttons {\"Check-in Anyway (This is a bad idea)\", \"I've Closed Them\"} default button \"I've Closed Them\"")
 
         if [[ "$user_choice" == "button returned:Check-in Anyway (This is a bad idea)" ]]; then
@@ -350,13 +344,30 @@ checkin() {
 
 
 
-set_log_message() {
-
+set_checkedout_file() {
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
+}
+
+set_log_message() {
+    set_checkedout_file
     CURRENT_USER=$(whoami)
 
     echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
     echo "commit_message=$commit_message" >> "$CHECKEDOUT_FILE"
+
+}
+
+cancel_checkout() {
+
+    handle_error "$1"
+    log_message "Cancelling checkout.  running git reset."
+    git reset --hard HEAD
+
+    moveToHiddenCheckinFolder
+
+    log_message "Exiting."
+    exit 1
 
 }
 
@@ -370,6 +381,8 @@ checkout() {
     fi
 
     display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server...." "Hide"
+
+    set_checkedout_file
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
@@ -386,21 +399,21 @@ checkout() {
             # it is cached, copy it to the checked out folder
             log_message "Repository $selected_repo is cached, but not checked out."
             log_message "Making repository $selected_repo writable"
-            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
             log_message "moving repo to checkedout folder..."
-            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checked out folder"
+            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || cancel_checkout "Couldn't move $selected_repo to the checked out folder"
         fi
 
     else
         log_message "Selected repo already checked out: $selected_repo"
     fi
     
-    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
     echo "Repository $selected_repo is now writable."
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
     log_message "Running git pull in $selected_repo"
-    git pull >> "$LOG_FILE" 2>&1 || handle_error "Git pull failed for $selected_repo"
+    git pull >> "$LOG_FILE" 2>&1 || cancel_checkout "Git pull failed for $selected_repo"
 
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
@@ -434,9 +447,9 @@ checkout() {
         #In case I can't update everyone at the same time, let's create the old checkedout file too:
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
 
-        git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
-        git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || handle_error "Failed to commit CHECKEDOUT file."
-        git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
+        git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."
+        git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to commit CHECKEDOUT file."
+        git push >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
     
