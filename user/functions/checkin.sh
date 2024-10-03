@@ -1,10 +1,55 @@
 #!/bin/bash
 
+
 # Function to check if files in the repository are open, excluding certain processes
 check_open_files() {
     open_files=$(lsof +D "$CHECKEDOUT_FOLDER/$selected_repo" | grep -v "^COMMAND" | grep -vE "(bash|lsof|awk|grep|mdworker_)")
+
     if [ -n "$open_files" ]; then
-        echo "$open_files"
+        log_message "There are open files:"
+        log_message "$open_files"
+
+        # Check if any of the open files are inside an .fcpbundle
+        fcpbundle_path=$(echo "$open_files" | awk '{print $9}' | grep ".fcpbundle" | sed 's|\(.*\.fcpbundle\).*|\1|' | uniq)
+
+        if [ -n "$fcpbundle_path" ]; then
+            log_message "Final Cut Pro library found: $fcpbundle_path"
+            
+            # Open the library in Final Cut Pro
+            osascript <<EOF
+tell application "Finder"
+    open POSIX file "$fcpbundle_path"
+end tell
+
+tell application "Final Cut Pro"
+    activate
+end tell
+EOF
+            
+            # Wait a few seconds to ensure the library is open
+            sleep 2
+
+            # Run the AppleScript to close the library
+            osascript <<EOF
+tell application "Final Cut Pro"
+    activate
+end tell
+
+tell application "System Events"
+    tell process "Final Cut Pro"
+        -- Click "File" menu
+        click menu bar item "File" of menu bar 1
+        delay 0.5
+        
+        -- Click "Close Library"
+        click menu item "Close Library" of menu 1 of menu bar item "File" of menu bar 1
+    end tell
+end tell
+EOF
+        else
+            log_message "No .fcpbundle files are currently open."
+        fi
+
         return 0  # Files are open
     else
         return 1  # No files are open
