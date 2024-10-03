@@ -1,4 +1,27 @@
 
+set_log_message() {
+
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+    CURRENT_USER=$(whoami)
+
+    echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
+    echo "commit_message=$commit_message" >> "$CHECKEDOUT_FILE"
+
+}
+
+cancel_checkout() {
+
+    handle_error "$1"
+    log_message "Cancelling checkout.  running git reset."
+    git reset --hard HEAD
+
+    moveToHiddenCheckinFolder
+
+    log_message "Exiting."
+    exit 1
+
+}
+
 checkout() {
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
@@ -25,21 +48,21 @@ checkout() {
             # it is cached, copy it to the checked out folder
             log_message "Repository $selected_repo is cached, but not checked out."
             log_message "Making repository $selected_repo writable"
-            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
             log_message "moving repo to checkedout folder..."
-            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Couldn't move $selected_repo to the checked out folder"
+            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || cancel_checkout "Couldn't move $selected_repo to the checked out folder"
         fi
 
     else
         log_message "Selected repo already checked out: $selected_repo"
     fi
     
-    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || handle_error "Failed to make repository $selected_repo writable"
+    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
     echo "Repository $selected_repo is now writable."
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
     log_message "Running git pull in $selected_repo"
-    git pull >> "$LOG_FILE" 2>&1 || handle_error "Git pull failed for $selected_repo"
+    git pull >> "$LOG_FILE" 2>&1 || cancel_checkout "Git pull failed for $selected_repo"
 
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
@@ -61,9 +84,10 @@ checkout() {
     else
         # Create the CHECKEDOUT file with the current user
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
-        git add "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" >> "$LOG_FILE" 2>&1 || handle_error "Failed to add CHECKEDOUT file."
-        git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || handle_error "Failed to commit CHECKEDOUT file."
-        git push >> "$LOG_FILE" 2>&1 || handle_error "Failed to push CHECKEDOUT file."
+
+        git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."
+        git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to commit CHECKEDOUT file."
+        git push >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
     

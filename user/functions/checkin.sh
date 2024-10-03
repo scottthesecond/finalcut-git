@@ -42,16 +42,10 @@ checkin() {
     while check_open_files; do
         open_files=$(lsof +D "$CHECKEDOUT_FOLDER/$selected_repo" | awk '{print $1, $9}' | grep -v "^COMMAND")
 
-        # Limit the size of the message passed to osascript
         open_files_short=$(echo "$open_files" | head -n 10)  # Show only the first 10 entries
         log_message "Warned user about open files in repository:"
         log_message "$open_files_short"
 
-        # Escape the open files list for AppleScript
-        # escaped_open_files=$(escape_for_applescript "$open_files_short")
-
-        # Show dialog to user listing the open files
-        #user_choice=$(osascript -e "display dialog \"The following files are open in other applications (showing up to 10):\n\n$escaped_open_files\n\nPlease close these files or choose to check in anyway.\" buttons {\"Check-in Anyway\", \"I've Closed Them\"} default button \"I've Closed Them\"")
         user_choice=$(osascript -e "display dialog \"There are files in this repository that are still open in other applications.  Please make sure everything is closed before checking in.\n\nYou can check the log to see which applications are using files in the repository.\" buttons {\"Check-in Anyway (This is a bad idea)\", \"I've Closed Them\"} default button \"I've Closed Them\"")
 
         if [[ "$user_choice" == "button returned:Check-in Anyway (This is a bad idea)" ]]; then
