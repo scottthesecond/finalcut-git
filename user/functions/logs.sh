@@ -1,5 +1,6 @@
 # Function to log messages
 log_message() {
+    echo "$1"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
 
