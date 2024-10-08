@@ -134,6 +134,8 @@ checkin() {
     else
         select_repo "Which repository do you want to check in?"
     fi
+    
+    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
 
     # Check for open files before proceeding
     while check_open_files; do
@@ -151,7 +153,6 @@ checkin() {
         fi
     done
 
-    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
 
     # Remove checkedout files
     rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" #V1 CHECKEDOUT File (remove once everyone is up-to-date)
