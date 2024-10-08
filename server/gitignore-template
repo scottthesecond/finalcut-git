@@ -1,0 +1,22 @@
+**/Render Files
+**/Original Media
+**/Transcoded Media
+**/Analysis Files
+**/Proxy Media
+
+Render Files/
+Analysis Files/
+Proxy Media/
+Original Media/
+Transcoded Media/ 
+
+.lock
+.lock-info
+**/.lock-dir
+
+*.fcpbundle/Settings.plist
+Settings.plist
+
+.fcpcache
+
+**/__Temp

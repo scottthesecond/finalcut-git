@@ -18,6 +18,16 @@ migration1.3(){
 
 }
 
+#migration2.0(){
+	
+	#TODO: check previous version, show dialog if they weren't on V2 before to let them know UNFLab now lives in the status bar. 
+	
+	#TODO: Add UNFLab to startup items
+
+	#TODO: Add periodic checkin to cron job maybe?
+
+#}
+
 setup() {
 	CONFIRM=$(osascript -e 'display dialog "Set up UNFlab?" buttons {"Yes", "No"} default button "Yes"' -e 'button returned of result')
 	if [ "$CONFIRM" == "No" ]; then

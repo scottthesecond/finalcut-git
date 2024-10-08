@@ -1,37 +1,114 @@
-URL=$1
+
+navbar=false
+script=""
+parameter=""
 
 migration1.3
 
-if [ -z "$URL" ]; then
-    # No parameters passed, display AppleScript dialog
-    SCRIPT=$(osascript <<EOD
-    set userChoice to choose from list {"checkin", "checkout", "setup"} with prompt "Choose an action:"
-    if userChoice is false then
-        return ""
-    else
-        return item 1 of userChoice
-    end if
-EOD
-)
-    if [ -z "$SCRIPT" ]; then
-        log_message "No action chosen. Exiting."
-        echo "No action chosen. Exiting."
-        exit 1
-    fi
-else
-log_message "Started with URL: $URL"
-    URLPATH="${URL#*//}"
-    SCRIPT=$(echo "$URLPATH" | cut -d'/' -f1)
-    PARAM=$(echo "$URLPATH" | cut -d'/' -f2)
-    log_message "Script: $SCRIPT"
-    log_message "Param: $PARAM"
+# Function to parse URL format
+parse_url() {
+  url=$1
+  # Extract the script and parameter from the URL (fcpgit://script/parameter)
+  script=$(echo $url | cut -d '/' -f 3)
+  parameter=$(echo $url | cut -d '/' -f 4)
+}
 
+# Parse arguments
+while [[ "$1" != "" ]]; do
+  case $1 in
+    -navbar)
+      navbar=true
+      ;;
+    fcpgit://*)
+      parse_url "$1"
+      ;;
+    " ↳ Quick Save "*)
+      script="checkpoint"
+      parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
+      ;;
+    " ↳ Check In "*)
+      script="checkin"
+      parameter=$(echo "$1" | sed 's/ ↳ Check In //')
+      ;;
+    "Check Out Another Project")
+      script="checkout"
+      ;;
+    " ↳ Go To "*)
+      script="open"
+      parameter=$(echo "$1" | sed 's/ ↳ Go To //')
+      ;;
+    \"*\")
+      # Remove the surrounding quotes from the project name
+      script="open"
+      parameter=$(echo "$1" | tr -d '"')
+      ;;
+    *)
+      if [ -z "$script" ]; then
+        script=$1
+      elif [ -z "$parameter" ]; then
+        parameter=$1
+      fi
+      ;;
+  esac
+  shift
+done
+
+log_message "Navbar: $navbar"
+log_message "Script: $script"
+
+# Remove surrounding quotes from the parameter if present
+parameter=$(echo "$parameter" | tr -d '"')
+
+log_message "Parameter: $parameter"
+
+if [ -n "$script" ]; then
+  case $script in
+    "checkin")
+      checkin "$parameter"
+      ;;
+    "checkout")
+      checkout "$parameter"
+      ;;
+    "checkpoint")
+      checkpoint "$parameter"
+      ;;
+    "setup")
+      setup "$parameter"
+      ;;
+    "open")
+      log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
+      open "$CHECKEDOUT_FOLDER/$parameter"
+      ;;
+    *)
+      echo "Unknown script: $script"
+      ;;
+  esac
 fi
 
-if [ "$SCRIPT" == "checkin" ]; then
-    checkin "$PARAM"
-elif [ "$SCRIPT" == "checkout" ]; then
-    checkout "$PARAM"
-elif [ "$SCRIPT" == "setup" ]; then
-    setup "$PARAM"
+if $NAVBAR_MODE; then
+
+    # Get checked out projects...
+    folders=("$CHECKEDOUT_FOLDER"/*)
+
+    # Check if there are any repositories
+    if [ ${#folders[@]} -eq 0 ]; then
+        echo "(You do not currently have any projects checked out)"
+    else
+        for i in "${!folders[@]}"; do
+            folder_name=$(basename "${folders[$i]}")
+            # Output action and folder name together
+            echo "\"$folder_name\""
+            echo " ↳ Check In \"$folder_name\""
+            #echo " ↳ Go To \"$folder_name\""
+            echo " ↳ Quick Save \"$folder_name\""
+
+        done
+    fi
+    echo "----"
+    echo "Check Out Another Project"
+    echo "----"
+    echo "UNF Lab Setup"
+    echo "----"
+    #log_message "Displayed menu options: checkin, checkout, setup"
+    exit 0
 fi

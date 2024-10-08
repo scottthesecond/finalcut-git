@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="1.4"
+VERSION="2.0"
 NAME="UNFlab"
 
 # Define the array of script paths
@@ -59,9 +59,11 @@ if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
 
     OUT_ZIP="$SCRIPT_DIR/build/$NAME $VERSION.zip"
     OUT_APP="$NAME.app"
+    #OUT_SB_APP="$NAME-statusbar.app"
 
-    /usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'None'  --interpreter '/bin/bash'  --uniform-type-identifiers 'public.item|public.folder' --uri-schemes 'fcpgit' --quit-after-execution "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
-
+    #/usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'None'  --interpreter '/bin/bash'  --uniform-type-identifiers 'public.item|public.folder' --uri-schemes 'fcpgit' --quit-after-execution "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
+    /usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --background --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'Status Menu'  --interpreter '/bin/bash'  --script-args '-navbar' --status-item-kind 'Text' --status-item-title 'UNFLab' --uri-schemes 'fcpgit' --status-item-sysfont --status-item-template-icon --uniform-type-identifiers 'public.item|public.folder'  "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
+  
     cd "$SCRIPT_DIR/build"
     zip -r "$OUT_ZIP" "$OUT_APP"
 

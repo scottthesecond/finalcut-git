@@ -1,7 +1,11 @@
 
-set_log_message() {
-
+set_checkedout_file() {
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
+}
+
+set_log_message() {
+    set_checkedout_file
     CURRENT_USER=$(whoami)
 
     echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
@@ -32,6 +36,8 @@ checkout() {
     fi
 
     display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server...." "Hide"
+
+    set_checkedout_file
 
     # Check if the repository exists locally
     if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
@@ -67,22 +73,33 @@ checkout() {
     # Navigate to the selected repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
-    # Get the current user
-    CURRENT_USER=$(whoami)
 
     # Check if the repository is already checked out
-    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
-        checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
+    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ] || [ -f "$CHECKEDOUT_FILE" ]; then
+        if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
+            checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
+        elif [ -f "$CHECKEDOUT_FILE" ]; then
+            checked_out_by=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+            commit_message=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+        fi
+
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
             
             log_message "Repository is already checked out by $checked_out_by"
             hide_dialog
-            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\" buttons {\"OK\"} default button \"OK\""
+            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
             moveToHiddenCheckinFolder
             exit 1
         fi
+
     else
-        # Create the CHECKEDOUT file with the current user
+
+        #Get the commit message
+        commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
+
+        set_log_message
+
+        #In case I can't update everyone at the same time, let's create the old checkedout file too:
         echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
 
         git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."

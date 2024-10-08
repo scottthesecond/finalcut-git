@@ -31,15 +31,7 @@ git clone "$repo_path" "$temp_dir"
 # Change into the temporary directory
 cd "$temp_dir"
 
-# Create a .gitignore to ignore final cut things we don't want to sync
-cat <<EOL > .gitignore
-**/Render Files
-**/Original Media
-**/Transcoded Media
-.lock
-.lock-info
-**/.lock-dir
-EOL
+cp gi_template .gitignore
 
 # Add and commit the .gitignore file to the cloned repository
 git add .gitignore
