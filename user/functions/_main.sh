@@ -3,8 +3,6 @@ navbar=false
 script=""
 parameter=""
 
-migration1.3
-
 # Function to parse URL format
 parse_url() {
   url=$1
