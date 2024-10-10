@@ -17,7 +17,15 @@ Set up a GIT server to use as your remote.  Then, distribute the fcp-git-user.sh
 
 If you user the included scripts on the GIT server to set up the repos, it will add a .gitignore file which prevents the syncing of linked media aliases, so users will not have to relink when syncing back-and-forth.
 
+## How to use
+1. Set up a GIT server.
+2. Build fcp-git into an app with Platypus (Install Platypus, then run `compile.sh`).
+3. Run fcp-git on the user machines – on first run, you will be prompted to set it up.  Enter GIT server details, then it will generate an SSH key.
+4. Add SSH key to GIT server.
+5. And that's it!
+
 ## Todo
+- [ ] Way to clean up cached repositories on local machines
 - [ ] Guides for setting up GIT server.
 - [ ] Periodic push?  Automatic checkin after inactivity?
 - [ ] Conflict resolution
