@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="2.0.2"
+VERSION="2.0.3"
 NAME="UNFlab"
 
 # Define the array of script paths
@@ -27,22 +27,16 @@ output_file="$SCRIPT_DIR/fcp-git-user.sh"
 # Start fresh by creating the file and adding the shebang
 echo "#!/bin/bash" > "$output_file"
 
-echo "VERSION=$VERSION" > "$output_file"
+echo "VERSION=$VERSION" >> "$output_file"
+echo "APP_NAME=$NAME" >> "$output_file"
 
 
 # Loop through the array and concatenate each script
 for script in "${scripts[@]}"; do
     if [ -f "$script" ]; then
         echo "Concatenating $script into $output_file..."
-        
-        # Add a comment in the output file to indicate the start of a new script
-        #echo -e "\n# --- Start of $script ---\n" >> "$output_file"
-        
-        # Append the content of the script to the output file
         cat "$script" >> "$output_file"
         echo -e "\n" >> "$output_file"
-        # Add a comment to indicate the end of the script
-        #echo -e "\n# --- End of $script ---\n" >> "$output_file"
     else
         echo "Warning: $script not found, skipping..."
     fi

@@ -1,4 +1,6 @@
-VERSION=2.0.2
+#!/bin/bash
+VERSION=2.0.3
+APP_NAME=UNFlab
 #!/bin/bash
 
 #Variables
@@ -699,8 +701,8 @@ if $NAVBAR_MODE; then
     folders=("$CHECKEDOUT_FOLDER"/*)
 
     # Check if there are any repositories
-    if [ ${#folders[@]} -eq 0 ]; then
-        echo "(You do not currently have any projects checked out)"
+    if [ "${folders[0]}" = "$CHECKEDOUT_FOLDER/*" ]; then
+        echo "No projects are checked out."
     else
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
@@ -715,7 +717,7 @@ if $NAVBAR_MODE; then
     echo "----"
     echo "Check Out Another Project"
     echo "----"
-    echo "UNFLab Version $VERSION"
+    echo "$APP_NAME Version $VERSION"
     echo "Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"
