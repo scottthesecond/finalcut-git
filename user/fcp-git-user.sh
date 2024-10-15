@@ -1,4 +1,4 @@
-#!/bin/bash
+VERSION=2.0.2
 #!/bin/bash
 
 #Variables
@@ -425,10 +425,11 @@ checkout() {
     
     hide_dialog
 
-    # Open the repository directory
-    open "$CHECKEDOUT_FOLDER/$selected_repo"
+    create_settings_plist
 
     display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
+
+    open_fcp_or_directory
 
     # Use AppleScript to display two buttons
     #response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
@@ -490,6 +491,119 @@ EOF
 }
 
 
+# Function to find the FCP bundle
+find_fcp_bundles() {
+    find "$CHECKEDOUT_FOLDER/$selected_repo" -type d -name "*.fcpbundle" -print0
+}
+
+# Function to create Settings.plist if it doesn't exist
+create_settings_plist() {
+
+    default_settings_file=$(cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>backupsEnabled</key>
+	<true/>
+	<key>cacheLocation</key>
+	<data>
+	Ym9va6wFAAAAAAQQMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkAQA
+	AAcAAAABAQAAVm9sdW1lcwAcAAAAAQEAAFVORiAtIEFjdGl2ZSBQcm9qZWN0IFNjcmF0
+	Y2gEAAAAAQEAAFRlbXAFAAAAAQEAAENBQ0hFAAAAEAAAAAEGAAAEAAAAFAAAADgAAABE
+	AAAACAAAAAQDAAAbQgAAAAAAAAAAAAABCgAAEAAAAAEGAABsAAAAfAAAAHwAAAB8AAAA
+	CAAAAAAEAABBxl+UPyc8BhgAAAABAgAAAgAAAAAAAAAPAQAAAAAAAAABAAAAAAAANQAA
+	AAEJAABmaWxlOi8vL1ZvbHVtZXMvVU5GJTIwLSUyMEFjdGl2ZSUyMFByb2plY3QlMjBT
+	Y3JhdGNoLwAAAAgAAAAEAwAAAAAAANAHAAAIAAAAAAQAAEHDKrQzuaucGAAAAAECAAAA
+	AAAAAAAAAO8TAAABAAAAAAAAAAAAAAAlAAAAAQEAAC9Wb2x1bWVzL1VORiAtIEFjdGl2
+	ZSBQcm9qZWN0IFNjcmF0Y2gAAABDAAAAAQkAAHNtYjovL1NIb2VrLUFkbWluQHVubmFt
+	ZWRuYXMwMi9VTkYlMjAtJTIwQWN0aXZlJTIwUHJvamVjdCUyMFNjcmF0Y2gACAAAAAEJ
+	AABmaWxlOi8vLw0AAAABAQAATWFjT1MgU2VxdW9pYQAAAAgAAAAEAwAAAFChG3MAAAAI
+	AAAAAAQAAEHGV/o4gAAAJAAAAAEBAAAwQjk3MEVGQy1EREQ4LTRCRjgtOUY1NC0wM0JG
+	MDJDMTQyNkQYAAAAAQIAAIEAAAABAAAA7xMAAAEAAAAAAAAAAAAAAAEAAAABAQAALwAA
+	AGAAAAD+////APAAAAAAAAAHAAAAAiAAAFwCAAAAAAAABSAAAMgBAAAAAAAAECAAANgB
+	AAAAAAAAESAAABACAAAAAAAAEiAAAPABAAAAAAAAEyAAAAACAAAAAAAAICAAADwCAAAA
+	AAAABAAAAAMDAAAA8AAABAAAAAMDAAAAAAAABAAAAAMDAAABAAAAFAAAAAEGAADQAgAA
+	3AIAAOgCAADcAgAA3AIAAA0AAAABAQAAcHVibGljLmZvbGRlcgAAAB4AAAABAQAATlNV
+	UkxWb2x1bWVVUkxGb3JSZW1vdW50aW5nS2V5AAARAAAAAQEAAE5TVVJMVm9sdW1lVVJM
+	S2V5AAAAMAAAAAEBAAAvVm9sdW1lcy9VTkYgLSBBY3RpdmUgUHJvamVjdCBTY3JhdGNo
+	L1RlbXAvQ0FDSEXiAAAAAQIAADRjZjE1ZmI1MDE5YzA5NmQ3ODhhZTFjOTBhNTQ4MTkz
+	ODQ5MGU3OGYxNDQxOGUwNTgzOWI3ODJiZGQwMzdkZTI7MDA7MDAwMDAwMDA7MDAwMDAw
+	MDA7MDAwMDAwMDA7MDAwMDAwMDAwMDAwMDAyMDtjb20uYXBwbGUuYXBwLXNhbmRib3gu
+	cmVhZC13cml0ZTswMTszNjAwMDAxZjswMDAwMDAwMDAwMjU1NGI2OzEyOy92b2x1bWVz
+	L3VuZiAtIGFjdGl2ZSBwcm9qZWN0IHNjcmF0Y2gvdGVtcC9jYWNoZQAAAOQAAAD+////
+	AQAAAGgCAAASAAAABBAAAFQAAAAAAAAABRAAAIQAAAAAAAAAEBAAAKwAAAAAAAAAQBAA
+	AJwAAAAAAAAAACAAAPQCAAAAAAAAAiAAAEwBAAAAAAAABSAAAMwAAAAAAAAAECAAABQA
+	AAAAAAAAEiAAAAwBAAAAAAAAEyAAABwBAAAAAAAAICAAACwBAAAAAAAAUCAAAHwBAAAA
+	AAAAF/AAAEQAAAAAAAAAgPAAAKQDAAAAAAAAAP8AAGwDAAAAAAAABAAPABADAAAAAAAA
+	KAMAgHwBAAAAAAAAUAMAgMwAAAAAAAAA
+	</data>
+	<key>mediaLocation</key>
+	<data>
+	Ym9va6wFAAAAAAQQMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkAQA
+	AAcAAAABAQAAVm9sdW1lcwAcAAAAAQEAAFVORiAtIEFjdGl2ZSBQcm9qZWN0IFNjcmF0
+	Y2gEAAAAAQEAAFRlbXAFAAAAAQEAAE1FRElBAAAAEAAAAAEGAAAEAAAAFAAAADgAAABE
+	AAAACAAAAAQDAAAbQgAAAAAAAAAAAAABCgAAEAAAAAEGAABsAAAAfAAAAHwAAAB8AAAA
+	CAAAAAAEAABBxl+UPPhl+BgAAAABAgAAAgAAAAAAAAAPAQAAAAAAAAABAAAAAAAANQAA
+	AAEJAABmaWxlOi8vL1ZvbHVtZXMvVU5GJTIwLSUyMEFjdGl2ZSUyMFByb2plY3QlMjBT
+	Y3JhdGNoLwAAAAgAAAAEAwAAAAAAANAHAAAIAAAAAAQAAEHDKrQzuaucGAAAAAECAAAA
+	AAAAAAAAAO8TAAABAAAAAAAAAAAAAAAlAAAAAQEAAC9Wb2x1bWVzL1VORiAtIEFjdGl2
+	ZSBQcm9qZWN0IFNjcmF0Y2gAAABDAAAAAQkAAHNtYjovL1NIb2VrLUFkbWluQHVubmFt
+	ZWRuYXMwMi9VTkYlMjAtJTIwQWN0aXZlJTIwUHJvamVjdCUyMFNjcmF0Y2gACAAAAAEJ
+	AABmaWxlOi8vLw0AAAABAQAATWFjT1MgU2VxdW9pYQAAAAgAAAAEAwAAAFChG3MAAAAI
+	AAAAAAQAAEHGV/o4gAAAJAAAAAEBAAAwQjk3MEVGQy1EREQ4LTRCRjgtOUY1NC0wM0JG
+	MDJDMTQyNkQYAAAAAQIAAIEAAAABAAAA7xMAAAEAAAAAAAAAAAAAAAEAAAABAQAALwAA
+	AGAAAAD+////APAAAAAAAAAHAAAAAiAAAFwCAAAAAAAABSAAAMgBAAAAAAAAECAAANgB
+	AAAAAAAAESAAABACAAAAAAAAEiAAAPABAAAAAAAAEyAAAAACAAAAAAAAICAAADwCAAAA
+	AAAABAAAAAMDAAAA8AAABAAAAAMDAAAAAAAABAAAAAMDAAABAAAAFAAAAAEGAADQAgAA
+	3AIAAOgCAADcAgAA3AIAAA0AAAABAQAAcHVibGljLmZvbGRlcgAAAB4AAAABAQAATlNV
+	UkxWb2x1bWVVUkxGb3JSZW1vdW50aW5nS2V5AAARAAAAAQEAAE5TVVJMVm9sdW1lVVJM
+	S2V5AAAAMAAAAAEBAAAvVm9sdW1lcy9VTkYgLSBBY3RpdmUgUHJvamVjdCBTY3JhdGNo
+	L1RlbXAvTUVESUHiAAAAAQIAADJkMDM3MmNmZjc4Y2FmZmQzYjhjMDA1Y2MwNWMyYmFj
+	NmMxMTMwZmY2ZGI4YjY0NWY4YzYwNmY0NzY2MDEzNTU7MDA7MDAwMDAwMDA7MDAwMDAw
+	MDA7MDAwMDAwMDA7MDAwMDAwMDAwMDAwMDAyMDtjb20uYXBwbGUuYXBwLXNhbmRib3gu
+	cmVhZC13cml0ZTswMTszNjAwMDAxZjswMDAwMDAwMDAwMjU1NGI1OzEyOy92b2x1bWVz
+	L3VuZiAtIGFjdGl2ZSBwcm9qZWN0IHNjcmF0Y2gvdGVtcC9tZWRpYQAAAOQAAAD+////
+	AQAAAGgCAAASAAAABBAAAFQAAAAAAAAABRAAAIQAAAAAAAAAEBAAAKwAAAAAAAAAQBAA
+	AJwAAAAAAAAAACAAAPQCAAAAAAAAAiAAAEwBAAAAAAAABSAAAMwAAAAAAAAAECAAABQA
+	AAAAAAAAEiAAAAwBAAAAAAAAEyAAABwBAAAAAAAAICAAACwBAAAAAAAAUCAAAHwBAAAA
+	AAAAF/AAAEQAAAAAAAAAgPAAAKQDAAAAAAAAAP8AAGwDAAAAAAAABAAPABADAAAAAAAA
+	KAMAgHwBAAAAAAAAUAMAgMwAAAAAAAAA
+	</data>
+</dict>
+</plist>
+EOF
+)
+
+    find_fcp_bundles | while IFS= read -r -d '' bundle_path; do
+        plist_path="$bundle_path/Settings.plist"
+        if [ ! -f "$plist_path" ]; then
+            # Create the Settings.plist file with the specified content
+            printf '%s\n' "$default_settings_file" > "$plist_path"
+            log_message "Created Settings.plist in $bundle_path"
+        else
+            log_message "Settings.plist already exists in $bundle_path"
+        fi
+    done    
+}
+
+
+# Function to open the FCP bundle or directory
+open_fcp_or_directory() {
+    found_bundle=false
+    find_fcp_bundles | while IFS= read -r -d '' bundle_path; do
+        found_bundle=true
+        open "$bundle_path"
+    done
+
+    # If no bundle is found, open the directory
+    if [ "$found_bundle" = false ]; then
+        log_message "No .fcpbundle found. Opening the directory."
+        open "$CHECKEDOUT_FOLDER/$selected_repo"
+    fi
+}
+
+
 
 navbar=false
 script=""
@@ -522,6 +636,9 @@ while [[ "$1" != "" ]]; do
       ;;
     "Check Out Another Project")
       script="checkout"
+      ;;
+    "Setup")
+      script="setup"
       ;;
     " ↳ Go To "*)
       script="open"
@@ -566,8 +683,9 @@ if [ -n "$script" ]; then
       setup "$parameter"
       ;;
     "open")
+      selected_repo="$parameter"
       log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
-      open "$CHECKEDOUT_FOLDER/$parameter"
+      open_fcp_or_directory
       ;;
     *)
       echo "Unknown script: $script"
@@ -597,7 +715,8 @@ if $NAVBAR_MODE; then
     echo "----"
     echo "Check Out Another Project"
     echo "----"
-    echo "UNF Lab Setup"
+    echo "UNFLab Version $VERSION"
+    echo "Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0

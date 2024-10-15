@@ -31,6 +31,9 @@ while [[ "$1" != "" ]]; do
     "Check Out Another Project")
       script="checkout"
       ;;
+    "Setup")
+      script="setup"
+      ;;
     " ↳ Go To "*)
       script="open"
       parameter=$(echo "$1" | sed 's/ ↳ Go To //')
@@ -74,8 +77,9 @@ if [ -n "$script" ]; then
       setup "$parameter"
       ;;
     "open")
+      selected_repo="$parameter"
       log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
-      open "$CHECKEDOUT_FOLDER/$parameter"
+      open_fcp_or_directory
       ;;
     *)
       echo "Unknown script: $script"
@@ -105,7 +109,8 @@ if $NAVBAR_MODE; then
     echo "----"
     echo "Check Out Another Project"
     echo "----"
-    echo "UNF Lab Setup"
+    echo "UNFLab Version $VERSION"
+    echo "Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0

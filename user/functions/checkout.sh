@@ -110,10 +110,11 @@ checkout() {
     
     hide_dialog
 
-    # Open the repository directory
-    open "$CHECKEDOUT_FOLDER/$selected_repo"
+    create_settings_plist
 
     display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
+
+    open_fcp_or_directory
 
     # Use AppleScript to display two buttons
     #response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")

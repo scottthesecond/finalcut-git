@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="2.0.1"
+VERSION="2.0.2"
 NAME="UNFlab"
 
 # Define the array of script paths
@@ -17,6 +17,7 @@ scripts=(
     "$FUNCTIONS/checkout.sh"
     "$FUNCTIONS/config.sh"
     "$FUNCTIONS/dialogs.sh"
+    "$FUNCTIONS/fcp.sh"
     "$FUNCTIONS/_main.sh"
 )
 
@@ -25,6 +26,9 @@ output_file="$SCRIPT_DIR/fcp-git-user.sh"
 
 # Start fresh by creating the file and adding the shebang
 echo "#!/bin/bash" > "$output_file"
+
+echo "VERSION=$VERSION" > "$output_file"
+
 
 # Loop through the array and concatenate each script
 for script in "${scripts[@]}"; do
