@@ -636,7 +636,7 @@ while [[ "$1" != "" ]]; do
       script="checkin"
       parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
-    "Check Out Another Project")
+    "Check out a recent project...")
       script="checkout"
       ;;
     "Setup")
@@ -715,7 +715,7 @@ if $NAVBAR_MODE; then
         done
     fi
     echo "----"
-    echo "Check Out Another Project"
+    echo "Check out a recent project..."
     echo "----"
     echo "$APP_NAME Version $VERSION"
     echo "Setup"
