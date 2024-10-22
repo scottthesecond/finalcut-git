@@ -99,9 +99,6 @@ checkout() {
 
         set_log_message
 
-        #In case I can't update everyone at the same time, let's create the old checkedout file too:
-        echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
-
         git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."
         git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to commit CHECKEDOUT file."
         git push >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push CHECKEDOUT file."
