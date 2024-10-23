@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Set the path to the new .gitignore file
+gi_template="$HOME/scripts/gitignore-template"  # Replace ~/ with $HOME for proper expansion
+
+
 if [ -z "$1" ]; then
   # If no argument is provided, prompt the user
   read -p "Enter the project name: " project_name
@@ -31,7 +35,7 @@ git clone "$repo_path" "$temp_dir"
 # Change into the temporary directory
 cd "$temp_dir"
 
-cp gi_template .gitignore
+cp "$gi_template" .gitignore
 
 # Add and commit the .gitignore file to the cloned repository
 git add .gitignore
