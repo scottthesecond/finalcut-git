@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION=2.0.3
+VERSION=2.0.4
 APP_NAME=UNFlab
 #!/bin/bash
 
@@ -315,18 +315,11 @@ checkin() {
 
 
 
-
-set_checkedout_file() {
-    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
-
-}
-
 set_log_message() {
-    set_checkedout_file
     CURRENT_USER=$(whoami)
 
-    echo "checked_out_by=$CURRENT_USER" > "$CHECKEDOUT_FILE"
-    echo "commit_message=$commit_message" >> "$CHECKEDOUT_FILE"
+    echo "checked_out_by=$CURRENT_USER" > ".CHECKEDOUT"
+    echo "commit_message=$commit_message" >> ".CHECKEDOUT"
 
 }
 
@@ -343,6 +336,10 @@ cancel_checkout() {
 
 }
 
+move_to_checkedout(){
+    mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo"
+}
+
 checkout() {
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
@@ -354,50 +351,50 @@ checkout() {
 
     display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server...." "Hide"
 
-    set_checkedout_file
-
-    # Check if the repository exists locally
-    if [ ! -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
-        log_message "Repo $selected_repo is not already checked out, seeing if we have it in the checkedin cache..."
-        
-        if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
-            #it is not cached, clone it
-            log_message "Repository $selected_repo does not exist locally. Cloning..."
-            
-            git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDOUT_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $new_repo"
-
-            log_message "Repository cloned: $selected_repo"
-        else
-            # it is cached, copy it to the checked out folder
-            log_message "Repository $selected_repo is cached, but not checked out."
-            log_message "Making repository $selected_repo writable"
-            chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
-            log_message "moving repo to checkedout folder..."
-            mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo" || cancel_checkout "Couldn't move $selected_repo to the checked out folder"
-        fi
-
-    else
+    # Check if the repository exists locally in CHECKEDOUT_FOLDER
+    if [ -d "$CHECKEDOUT_FOLDER/$selected_repo" ]; then
         log_message "Selected repo already checked out: $selected_repo"
+        open_fcp_or_directory
+        return
     fi
-    
-    chmod -R u+w "$CHECKEDOUT_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
-    echo "Repository $selected_repo is now writable."
-    cd "$CHECKEDOUT_FOLDER/$selected_repo"
 
-    log_message "Running git pull in $selected_repo"
-    git pull >> "$LOG_FILE" 2>&1 || cancel_checkout "Git pull failed for $selected_repo"
+   # Check if the repository is available in the CHECKEDIN_FOLDER
+    if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
+        log_message "Repository $selected_repo does not exist locally. Cloning..."
+        
+        # Clone it directly to CHECKEDOUT_FOLDER if not cached
+        git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $selected_repo"
+        log_message "Repository cloned: $selected_repo"
 
-    # Navigate to the selected repository
-    cd "$CHECKEDOUT_FOLDER/$selected_repo"
+        # Set the directory writable in CHECKEDOUT_FOLDER and proceed with other actions
+        chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
+        log_message "Repository $selected_repo is now writable."
+
+        cd "$CHECKEDIN_FOLDER/$selected_repo"
+    else
+        # If cached, make it writable and perform git pull in CHECKEDIN_FOLDER
+        log_message "Repository $selected_repo is cached, but not checked out."
+        log_message "Making repository $selected_repo writable"
+        
+        chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
+
+        cd "$CHECKEDIN_FOLDER/$selected_repo"
+
+        log_message "Running git pull in $selected_repo"
+        git pull >> "$LOG_FILE" 2>&1 || cancel_checkout "Git pull failed for $selected_repo"
+
+    fi
+
+
 
 
     # Check if the repository is already checked out
-    if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ] || [ -f "$CHECKEDOUT_FILE" ]; then
-        if [ -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" ]; then
-            checked_out_by=$(cat "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT")
-        elif [ -f "$CHECKEDOUT_FILE" ]; then
-            checked_out_by=$(grep 'checked_out_by=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-            commit_message=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+    if [ -f "CHECKEDOUT" ] || [ -f ".CHECKEDOUT" ]; then
+        if [ -f "CHECKEDOUT" ]; then
+            checked_out_by=$(cat "CHECKEDOUT") #Backwards compatability with old version of unflab that did not use a hidden file
+        elif [ -f  ".CHECKEDOUT" ]; then
+            checked_out_by=$(grep 'checked_out_by=' ".CHECKEDOUT" | cut -d '=' -f 2)
+            commit_message=$(grep 'commit_message=' ".CHECKEDOUT" | cut -d '=' -f 2)
         fi
 
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
@@ -405,7 +402,6 @@ checkout() {
             log_message "Repository is already checked out by $checked_out_by"
             hide_dialog
             osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
-            moveToHiddenCheckinFolder
             exit 1
         fi
 
@@ -416,15 +412,16 @@ checkout() {
 
         set_log_message
 
-        #In case I can't update everyone at the same time, let's create the old checkedout file too:
-        echo "$CURRENT_USER" > "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT"
-
-        git add "$CHECKEDOUT_FILE" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."
-        git commit -m "Checked out by $CURRENT_USER" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to commit CHECKEDOUT file."
+        git add . >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."
+        git commit -m "Checked out by $CURRENT_USER: $commit_message" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to commit CHECKEDOUT file."
         git push >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
     
+    # Move it to CHECKEDOUT_FOLDER after successful pull
+    log_message "Moving repo to checkedout folder..."
+    move_to_checkedout || cancel_checkout "Couldn't move $selected_repo to the checked out folder"
+
     hide_dialog
 
     create_settings_plist
@@ -432,16 +429,6 @@ checkout() {
     display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
 
     open_fcp_or_directory
-
-    # Use AppleScript to display two buttons
-    #response=$(osascript -e "display dialog \"You are now checked out into $selected_repo.\n\nYou can either press leave this window open and press 'Check In Now' when you are done making changes, or you can hide this window and check the project in with UNFlab later.\" buttons {\"Check In Now\", \"Hide UNFLab\"} default button \"Check In Now\"")
-
-    # Check if the user selected 'Check In'
-    #if [[ "$response" == "button returned:Check In Now" ]]; then
-    #    checkin "$selected_repo"
-    #else
-    #    osascript -e "display dialog \"When you're finished editing, launch UNFlab, choose 'Check In', and select $selected_repo.\" buttons {\"OK\"} default button \"OK\""
-    #fi
 
 }
 
