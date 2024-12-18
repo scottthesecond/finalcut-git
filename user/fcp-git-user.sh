@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION=2.0.4
+VERSION=2.0.5
 APP_NAME=UNFlab
 #!/bin/bash
 
@@ -11,6 +11,12 @@ CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
 LOG_FILE="$DATA_FOLDER/fcp-git.log"
 selected_repo=""
+
+# Get the full path of the script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
+
+
 
 # Function to log messages
 log_message() {
@@ -175,99 +181,45 @@ moveToHiddenCheckinFolder(){
 
 
 commitAndPush() {
-
     # Get the current date and the user's name
     current_date=$(date +"%Y-%m-%d")
+
+    
     user_name=$(whoami)
 
-    #Get Commit Message
-    commit_message_user=""
+    # Get Commit Message
     commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
     
     if [ -z "$commit_message_user" ]; then
         commit_message="Commit on $current_date by $user_name"
     else
-        commit_message="$user_name: $commit_message"
+        commit_message="$user_name: $commit_message_user"
     fi
 
+    # Check for unstaged changes
+    log_message "Checking for unstaged changes in $selected_repo"
+    if git diff-index --quiet HEAD --; then
+        log_message "No changes to commit in $selected_repo."
+        return 0
+    fi
 
-    # Stage all changes, commit with the current date and username, and push
+    # Stage all changes
     log_message "Staging changes in $selected_repo"
     git add . >> "$LOG_FILE" 2>&1 || handle_error "Failed to stage changes in $selected_repo"
+
+    # Commit with the message and push
     log_message "Committing changes in $selected_repo"
     git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
+
     log_message "Pushing changes for $selected_repo"
     git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
+    
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
-
 }
 
 
-checkpoint() {
-
-    # Check if the repository is passed as an argument
-    if [ -n "$1" ]; then
-        selected_repo="$1"
-        cd "$CHECKEDOUT_FOLDER/$selected_repo"
-    else
-        select_repo "Which repository do you want to Checkpoint?"
-    fi
-
-    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
-
-    commit_message_user=""
-    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-
-    log_message "Current commit message: $commit_message_user"
-
-    result=$(osascript -e "display dialog \"What did you change so far?\nI'll sync the project to the server (It'll stay checked out) with the log message below.\n\nIf you'll be working on something different going forward and would like to change your log message for autosaves after this, use Checkpoint w/ New Log Message.\" default answer \"$commit_message_user\" with title \"New Checkpoint\" buttons {\"Cancel\", \"Checkpoint\", \"Checkpoint and Change Message\"} default button \"Checkpoint\"")
-    
-    log_message "Dialog Result: $result"
-    
-        # Parse button clicked and commit message using sed
-        button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
-        commit_message=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
-
-        # Log the parsed values for debugging
-        log_message "Button clicked: $button_clicked"
-        log_message "Commit message: $commit_message"
-
-    set_log_message
-    
-    if [ "$button_clicked" = "Checkpoint" ]; then
-
-        display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
-        commitAndPush
-        display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
-        hide_dialog
-
-        # Code to execute when confirmed
-        log_message "Confirmed with message: $commit_message"
-        # Add your logic here for when the user confirms
-    elif [ "$button_clicked" = "CheckpointandChangeMessage" ]; then
-        
-        nextResult=$(osascript -e "display dialog \"What are you working on now?\n\nI'll use this for autosaves going forward\" default answer \"$commit_message\" with title \"Checkpoint Message\" buttons {\"OK\"} default button \"OK\"")
-
-        display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
-        commitAndPush
-        
-        commit_message=$(echo "$nextResult" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
-        set_log_message
-
-        display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
-        hide_dialog
-
-        log_message "Checkpoint Created and message changed to: $commit_message"
-
-    else
-        # Code to execute when canceled
-        log_message "User canceled"
-        # Add your logic here for when the user cancels
-    fi
 
 
-
-}
 
 
 checkin() {
@@ -314,6 +266,128 @@ checkin() {
 }
 
 
+
+
+
+
+checkpoint() {
+
+    # Check if the repository is passed as an argument
+    if [ -n "$1" ]; then
+        selected_repo="$1"
+        cd "$CHECKEDOUT_FOLDER/$selected_repo"
+    else
+        select_repo "Which repository do you want to Checkpoint?"
+    fi
+
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
+    commit_message_user=""
+    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+
+    log_message "Current commit message: $commit_message_user"
+
+    update_checkin_time
+
+    result=$(osascript -e "display dialog \"What did you change so far?\nI'll sync the project to the server (It'll stay checked out) with the log message below.\n\nIf you'll be working on something different going forward and would like to change your log message for autosaves after this, use Checkpoint w/ New Log Message.\" default answer \"$commit_message_user\" with title \"New Checkpoint\" buttons {\"Cancel\", \"Checkpoint\", \"Checkpoint and Change Message\"} default button \"Checkpoint\"")
+    
+    log_message "Dialog Result: $result"
+    
+        # Parse button clicked and commit message using sed
+        button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
+        commit_message=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
+
+        # Log the parsed values for debugging
+        log_message "Button clicked: $button_clicked"
+        log_message "Commit message: $commit_message"
+
+    set_log_message
+    
+    if [ "$button_clicked" = "Checkpoint" ]; then
+
+        
+         display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
+
+         commitAndPush
+         display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
+         hide_dialog
+        # create_checkpoint
+
+        # Code to execute when confirmed
+        log_message "Confirmed with message: $commit_message"
+        # Add your logic here for when the user confirms
+    elif [ "$button_clicked" = "CheckpointandChangeMessage" ]; then
+        
+        nextResult=$(osascript -e "display dialog \"What are you working on now?\n\nI'll use this for autosaves going forward\" default answer \"$commit_message\" with title \"Checkpoint Message\" buttons {\"OK\"} default button \"OK\"")
+
+        display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
+        commitAndPush
+        
+        commit_message=$(echo "$nextResult" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
+        set_log_message
+
+        display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
+        hide_dialog
+
+        log_message "Checkpoint Created and message changed to: $commit_message"
+
+    else
+        # Code to execute when canceled
+        log_message "User canceled"
+        # Add your logic here for when the user cancels
+    fi
+
+
+
+
+}
+
+
+# Function: Checkpoint all checked out repositories
+checkpoint_all() {
+    # Get all checked out repositories
+    folders=("$CHECKEDOUT_FOLDER"/*)
+    
+    # Check if there are any repositories
+    if [ ${#folders[@]} -eq 0 ]; then
+        echo "No repositories are currently checked out."
+        return
+    fi
+    
+    for folder in "${folders[@]}"; do
+        if [ -d "$folder" ]; then
+            selected_repo=$(basename "$folder")
+            
+            
+
+            echo "Creating checkpoint for: $selected_repo"
+            #log_message "Creating checkpoint for: $selected_repo"
+            #create_checkpoint "$selected_repo"
+
+            update_checkin_time
+            commitAndPush
+            display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
+
+        fi
+    done
+}
+
+update_checkin_time() {
+
+    # Format the current time as MM/DD HH:MM
+    current_time=$(date "+%m/%d %H:%M")
+
+    cd "$CHECKEDOUT_FOLDER/$selected_repo"
+    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
+
+        # Update or append LAST_CHECKIN in the .CHECKEDOUT file
+    if grep -q "^LAST_COMMIT=" "$CHECKEDOUT_FILE"; then
+     sed -i '' "s|^LAST_COMMIT=.*|LAST_COMMIT=$current_time|" "$CHECKEDOUT_FILE"
+    else
+        echo "LAST_COMMIT=$current_time" >> "$CHECKEDOUT_FILE"
+    fi
+
+}
 
 set_log_message() {
     CURRENT_USER=$(whoami)
@@ -593,10 +667,39 @@ open_fcp_or_directory() {
 }
 
 
+enable_auto_checkpoint() {
+
+# Define the command you want to schedule
+CRON_COMMAND="$SCRIPT_PATH checkpointall"
+
+# Define the cron schedule (every 15 minutes)
+CRON_SCHEDULE="*/15 * * * *"
+
+# Combine them into a single cron job entry
+CRON_JOB="$CRON_SCHEDULE $CRON_COMMAND"
+
+# Check if the crontab already contains this job
+(crontab -l 2>/dev/null | grep -F "$CRON_COMMAND") >/dev/null 2>&1 || {
+    # If not found, append the new cron job
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab - 2>/dev/null
+    display_notification "Autosave Enabled" "UNFLab will autosave your work every 15 minutes."
+
+}
+
+# Optional: Ensure the script is executable
+chmod +x "$SCRIPT_PATH"
+
+}
+
+
+
 
 navbar=false
 script=""
 parameter=""
+
+enable_auto_checkpoint
+
 
 # Function to parse URL format
 parse_url() {
@@ -615,6 +718,9 @@ while [[ "$1" != "" ]]; do
     fcpgit://*)
       parse_url "$1"
       ;;
+    checkpointall)
+      script="checkpointall"
+      ;;
     " ↳ Quick Save "*)
       script="checkpoint"
       parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
@@ -623,11 +729,8 @@ while [[ "$1" != "" ]]; do
       script="checkin"
       parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
-    "Check out a recent project...")
+    "Check Out Another Project")
       script="checkout"
-      ;;
-    "Setup")
-      script="setup"
       ;;
     " ↳ Go To "*)
       script="open"
@@ -668,18 +771,21 @@ if [ -n "$script" ]; then
     "checkpoint")
       checkpoint "$parameter"
       ;;
+    "checkpointall") 
+      checkpoint_all
+      ;;
     "setup")
       setup "$parameter"
       ;;
     "open")
-      selected_repo="$parameter"
       log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
-      open_fcp_or_directory
+      open "$CHECKEDOUT_FOLDER/$parameter"
       ;;
     *)
       echo "Unknown script: $script"
       ;;
   esac
+
 fi
 
 if $NAVBAR_MODE; then
@@ -688,13 +794,30 @@ if $NAVBAR_MODE; then
     folders=("$CHECKEDOUT_FOLDER"/*)
 
     # Check if there are any repositories
-    if [ "${folders[0]}" = "$CHECKEDOUT_FOLDER/*" ]; then
-        echo "No projects are checked out."
+    if [ ${#folders[@]} -eq 0 ]; then
+        echo "(You do not currently have any projects checked out)"
     else
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
+
+            # Determine the path to the .CHECKEDOUT file
+            CHECKEDOUT_FILE="${folders[$i]}/.CHECKEDOUT"
+            
             # Output action and folder name together
             echo "\"$folder_name\""
+
+            # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
+            if [ -f "$CHECKEDOUT_FILE" ]; then
+                last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+                # Output project information along with the last checkpoint time
+                echo " ↳ Last Checkpoint: $last_checkpoint"
+
+           # else
+                # last_checkpoint="No checkpoint available"
+            fi
+
+
+
             echo " ↳ Check In \"$folder_name\""
             #echo " ↳ Go To \"$folder_name\""
             echo " ↳ Quick Save \"$folder_name\""
@@ -702,12 +825,13 @@ if $NAVBAR_MODE; then
         done
     fi
     echo "----"
-    echo "Check out a recent project..."
+    echo "Check Out Another Project"
     echo "----"
-    echo "$APP_NAME Version $VERSION"
-    echo "Setup"
+    echo "UNF Lab Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0
 fi
+
+
 

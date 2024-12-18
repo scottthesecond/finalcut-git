@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="2.0.4"
+VERSION="2.0.5"
 NAME="UNFlab"
 
 # Define the array of script paths
@@ -14,10 +14,12 @@ scripts=(
     "$FUNCTIONS/setup.sh"
     "$FUNCTIONS/select_repo.sh"
     "$FUNCTIONS/checkin.sh"
+    "$FUNCTIONS/checkpoint.sh"
     "$FUNCTIONS/checkout.sh"
     "$FUNCTIONS/config.sh"
     "$FUNCTIONS/dialogs.sh"
     "$FUNCTIONS/fcp.sh"
+    "$FUNCTIONS/enable_auto_checkpoint.sh"
     "$FUNCTIONS/_main.sh"
 )
 

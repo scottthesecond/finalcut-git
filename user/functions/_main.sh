@@ -3,6 +3,9 @@ navbar=false
 script=""
 parameter=""
 
+enable_auto_checkpoint
+
+
 # Function to parse URL format
 parse_url() {
   url=$1
@@ -20,6 +23,9 @@ while [[ "$1" != "" ]]; do
     fcpgit://*)
       parse_url "$1"
       ;;
+    checkpointall)
+      script="checkpointall"
+      ;;
     " ↳ Quick Save "*)
       script="checkpoint"
       parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
@@ -28,11 +34,8 @@ while [[ "$1" != "" ]]; do
       script="checkin"
       parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
-    "Check out a recent project...")
+    "Check Out Another Project")
       script="checkout"
-      ;;
-    "Setup")
-      script="setup"
       ;;
     " ↳ Go To "*)
       script="open"
@@ -73,18 +76,21 @@ if [ -n "$script" ]; then
     "checkpoint")
       checkpoint "$parameter"
       ;;
+    "checkpointall") 
+      checkpoint_all
+      ;;
     "setup")
       setup "$parameter"
       ;;
     "open")
-      selected_repo="$parameter"
       log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
-      open_fcp_or_directory
+      open "$CHECKEDOUT_FOLDER/$parameter"
       ;;
     *)
       echo "Unknown script: $script"
       ;;
   esac
+
 fi
 
 if $NAVBAR_MODE; then
@@ -93,13 +99,30 @@ if $NAVBAR_MODE; then
     folders=("$CHECKEDOUT_FOLDER"/*)
 
     # Check if there are any repositories
-    if [ "${folders[0]}" = "$CHECKEDOUT_FOLDER/*" ]; then
-        echo "No projects are checked out."
+    if [ ${#folders[@]} -eq 0 ]; then
+        echo "(You do not currently have any projects checked out)"
     else
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
+
+            # Determine the path to the .CHECKEDOUT file
+            CHECKEDOUT_FILE="${folders[$i]}/.CHECKEDOUT"
+            
             # Output action and folder name together
             echo "\"$folder_name\""
+
+            # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
+            if [ -f "$CHECKEDOUT_FILE" ]; then
+                last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+                # Output project information along with the last checkpoint time
+                echo " ↳ Last Checkpoint: $last_checkpoint"
+
+           # else
+                # last_checkpoint="No checkpoint available"
+            fi
+
+
+
             echo " ↳ Check In \"$folder_name\""
             #echo " ↳ Go To \"$folder_name\""
             echo " ↳ Quick Save \"$folder_name\""
@@ -107,11 +130,11 @@ if $NAVBAR_MODE; then
         done
     fi
     echo "----"
-    echo "Check out a recent project..."
+    echo "Check Out Another Project"
     echo "----"
-    echo "$APP_NAME Version $VERSION"
-    echo "Setup"
+    echo "UNF Lab Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0
 fi
+
