@@ -827,7 +827,8 @@ if $NAVBAR_MODE; then
     echo "----"
     echo "Check Out Another Project"
     echo "----"
-    echo "UNF Lab Setup"
+    echo "$APP_NAME Version $VERSION"
+    echo "Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0
