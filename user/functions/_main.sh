@@ -1,4 +1,3 @@
-
 navbar=false
 script=""
 parameter=""
@@ -116,15 +115,16 @@ if $NAVBAR_MODE; then
                 last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
                 # Output project information along with the last checkpoint time
                 echo " ↳ Last Checkpoint: $last_checkpoint"
-
-           # else
-                # last_checkpoint="No checkpoint available"
             fi
 
-
+            # Read the LAST_CHECKIN value from the .CHECKEDOUT file
+            if [ -f "$CHECKEDOUT_FILE" ]; then
+                last_checkin=$(grep 'LAST_CHECKIN=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+                # Output project information along with the last check-in time
+                echo " ↳ Last Check-in: $last_checkin"
+            fi
 
             echo " ↳ Check In \"$folder_name\""
-            #echo " ↳ Go To \"$folder_name\""
             echo " ↳ Quick Save \"$folder_name\""
 
         done
@@ -135,7 +135,6 @@ if $NAVBAR_MODE; then
     echo "$APP_NAME Version $VERSION"
     echo "Setup"
     echo "----"
-    #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0
 fi
 

@@ -1,6 +1,3 @@
-
-
-
 checkpoint() {
 
     # Check if the repository is passed as an argument
@@ -76,6 +73,14 @@ checkpoint() {
 
 # Function: Checkpoint all checked out repositories
 checkpoint_all() {
+
+    # Check if auto checkpoint is enabled
+    if [ -f "$AUTO_CHECKPOINT_FLAG" ] && [ "$(cat "$AUTO_CHECKPOINT_FLAG")" = "disabled" ]; then
+        log_message "Auto checkpoint is disabled due to a previous check-in failure."
+        echo "Auto checkpoint is disabled due to a previous check-in failure."
+        return
+    fi
+
     # Get all checked out repositories
     folders=("$CHECKEDOUT_FOLDER"/*)
     
@@ -111,9 +116,16 @@ update_checkin_time() {
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
 
-        # Update or append LAST_CHECKIN in the .CHECKEDOUT file
+    # Update or append LAST_CHECKIN in the .CHECKEDOUT file
+    if grep -q "^LAST_CHECKIN=" "$CHECKEDOUT_FILE"; then
+        sed -i '' "s|^LAST_CHECKIN=.*|LAST_CHECKIN=$current_time|" "$CHECKEDOUT_FILE"
+    else
+        echo "LAST_CHECKIN=$current_time" >> "$CHECKEDOUT_FILE"
+    fi
+
+    # Update or append LAST_COMMIT in the .CHECKEDOUT file
     if grep -q "^LAST_COMMIT=" "$CHECKEDOUT_FILE"; then
-     sed -i '' "s|^LAST_COMMIT=.*|LAST_COMMIT=$current_time|" "$CHECKEDOUT_FILE"
+        sed -i '' "s|^LAST_COMMIT=.*|LAST_COMMIT=$current_time|" "$CHECKEDOUT_FILE"
     else
         echo "LAST_COMMIT=$current_time" >> "$CHECKEDOUT_FILE"
     fi
