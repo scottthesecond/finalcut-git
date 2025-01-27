@@ -43,7 +43,6 @@ commitAndPush() {
     # Get the current date and the user's name
     current_date=$(date +"%Y-%m-%d")
 
-    
     user_name=$(whoami)
 
     # Get Commit Message
@@ -71,15 +70,15 @@ commitAndPush() {
     git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
 
     log_message "Pushing changes for $selected_repo"
-    git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
-    
-    log_message "Changes have been successfully checked in and pushed for $selected_repo."
+    if git push >> "$LOG_FILE" 2>&1; then
+        log_message "Changes have been successfully checked in and pushed for $selected_repo."
+        echo "enabled" > "$AUTO_CHECKPOINT_FLAG"
+    else
+        log_message "Git push failed for $selected_repo"
+        echo "disabled" > "$AUTO_CHECKPOINT_FLAG"
+        handle_error "Git push failed for $selected_repo"
+    fi
 }
-
-
-
-
-
 
 checkin() {
 
@@ -93,6 +92,10 @@ checkin() {
     fi
     
     display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
+
+    # Check git connection before proceeding
+    check_git_connection
+
 
     # Check for open files before proceeding
     while check_open_files; do

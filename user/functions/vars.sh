@@ -8,6 +8,7 @@ CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
 LOG_FILE="$DATA_FOLDER/fcp-git.log"
 selected_repo=""
+AUTO_CHECKPOINT_FLAG="$DATA_FOLDER/auto_checkpoint_enabled"
 
 # Get the full path of the script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
