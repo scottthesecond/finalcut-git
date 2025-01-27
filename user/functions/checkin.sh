@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Function to check git connection
+check_git_connection() {
+    git remote update > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        handle_error "Failed to connect to the remote repository. Please check your network connection and remote repository settings."
+    else
+        log_message "Git connection successful."
+    fi
+}
+
 # Function to check if files in the repository are open, excluding certain processes
 check_open_files() {
     open_files=$(lsof +D "$CHECKEDOUT_FOLDER/$selected_repo" | grep -v "^COMMAND" | grep -vE "(bash|lsof|awk|grep|mdworker_|osascript)")
