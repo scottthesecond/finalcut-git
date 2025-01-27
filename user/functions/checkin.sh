@@ -76,7 +76,7 @@ commitAndPush() {
     else
         log_message "Git push failed for $selected_repo"
         echo "disabled" > "$AUTO_CHECKPOINT_FLAG"
-        handle_error "Git push failed for $selected_repo"
+        handle_error "Git push failed for $selected_repo.  Auto checkpoint has been disabled.  Check your connection and manually check in or quick save to re-enable auto check-in." true
     fi
 }
 
