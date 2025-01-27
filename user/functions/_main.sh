@@ -129,6 +129,17 @@ if $NAVBAR_MODE; then
 
         done
     fi
+
+    # Check if auto check-in is enabled
+    if [ -f "$AUTO_CHECKPOINT_FLAG" ]; then
+        auto_checkpoint_status=$(cat "$AUTO_CHECKPOINT_FLAG")
+        if [ "$auto_checkpoint_status" = "enabled" ]; then
+            echo "(Automatically uploading changes every 15 minutes)"
+        else
+            echo "‼️ Auto save is disabled!"
+        fi
+    fi
+
     echo "----"
     echo "Check Out Another Project"
     echo "----"
