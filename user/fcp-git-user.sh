@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION=2.0.5
+VERSION=2.0.6
 APP_NAME=UNFlab
 #!/bin/bash
 
@@ -11,6 +11,7 @@ CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
 LOG_FILE="$DATA_FOLDER/fcp-git.log"
 selected_repo=""
+AUTO_CHECKPOINT_FLAG="$DATA_FOLDER/auto_checkpoint_enabled"
 
 # Get the full path of the script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,9 +26,18 @@ log_message() {
 
 # Function to handle errors
 handle_error() {
-    echo "$1"
-    log_message "ERROR: $1"
-    osascript -e "display dialog \"Error: $1.  See log for details.\" buttons {\"OK\"} default button \"OK\""
+    local error_message="$1"
+    local show_dialog="$2"
+
+    echo "$error_message"
+    log_message "ERROR: $error_message"
+
+    if [ "$show_dialog" = true ]; then
+        osascript -e "display dialog \"Error: $error_message. See log for details.\" buttons {\"OK\"} default button \"OK\""
+    else
+        display_notification "Error" "$error_message" "See log for details."
+    fi
+
     exit 1
 }
 
@@ -151,6 +161,16 @@ select_repo() {
 
 #!/bin/bash
 
+# Function to check git connection
+check_git_connection() {
+    git remote update > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        handle_error "Failed to connect to the remote repository. Please check your network connection and remote repository settings."
+    else
+        log_message "Git connection successful."
+    fi
+}
+
 # Function to check if files in the repository are open, excluding certain processes
 check_open_files() {
     open_files=$(lsof +D "$CHECKEDOUT_FOLDER/$selected_repo" | grep -v "^COMMAND" | grep -vE "(bash|lsof|awk|grep|mdworker_|osascript)")
@@ -184,7 +204,6 @@ commitAndPush() {
     # Get the current date and the user's name
     current_date=$(date +"%Y-%m-%d")
 
-    
     user_name=$(whoami)
 
     # Get Commit Message
@@ -212,15 +231,15 @@ commitAndPush() {
     git commit -m "$commit_message" >> "$LOG_FILE" 2>&1 || handle_error "Git commit failed in $selected_repo"
 
     log_message "Pushing changes for $selected_repo"
-    git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
-    
-    log_message "Changes have been successfully checked in and pushed for $selected_repo."
+    if git push >> "$LOG_FILE" 2>&1; then
+        log_message "Changes have been successfully checked in and pushed for $selected_repo."
+        echo "enabled" > "$AUTO_CHECKPOINT_FLAG"
+    else
+        log_message "Git push failed for $selected_repo"
+        echo "disabled" > "$AUTO_CHECKPOINT_FLAG"
+        handle_error "Git push failed for $selected_repo.  Auto checkpoint has been disabled.  Check your connection and manually check in or quick save to re-enable auto check-in." true
+    fi
 }
-
-
-
-
-
 
 checkin() {
 
@@ -234,6 +253,10 @@ checkin() {
     fi
     
     display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
+
+    # Check git connection before proceeding
+    check_git_connection
+
 
     # Check for open files before proceeding
     while check_open_files; do
@@ -264,9 +287,6 @@ checkin() {
     # Set the repository to read-only
     #echo "Repository $selected_repo is now read-only."
 }
-
-
-
 
 
 
@@ -345,6 +365,14 @@ checkpoint() {
 
 # Function: Checkpoint all checked out repositories
 checkpoint_all() {
+
+    # Check if auto checkpoint is enabled
+    if [ -f "$AUTO_CHECKPOINT_FLAG" ] && [ "$(cat "$AUTO_CHECKPOINT_FLAG")" = "disabled" ]; then
+        log_message "Auto checkpoint is disabled due to a previous check-in failure."
+        echo "Auto checkpoint is disabled due to a previous check-in failure."
+        return
+    fi
+
     # Get all checked out repositories
     folders=("$CHECKEDOUT_FOLDER"/*)
     
@@ -380,9 +408,16 @@ update_checkin_time() {
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
 
-        # Update or append LAST_CHECKIN in the .CHECKEDOUT file
+    # Update or append LAST_CHECKIN in the .CHECKEDOUT file
+    if grep -q "^LAST_CHECKIN=" "$CHECKEDOUT_FILE"; then
+        sed -i '' "s|^LAST_CHECKIN=.*|LAST_CHECKIN=$current_time|" "$CHECKEDOUT_FILE"
+    else
+        echo "LAST_CHECKIN=$current_time" >> "$CHECKEDOUT_FILE"
+    fi
+
+    # Update or append LAST_COMMIT in the .CHECKEDOUT file
     if grep -q "^LAST_COMMIT=" "$CHECKEDOUT_FILE"; then
-     sed -i '' "s|^LAST_COMMIT=.*|LAST_COMMIT=$current_time|" "$CHECKEDOUT_FILE"
+        sed -i '' "s|^LAST_COMMIT=.*|LAST_COMMIT=$current_time|" "$CHECKEDOUT_FILE"
     else
         echo "LAST_COMMIT=$current_time" >> "$CHECKEDOUT_FILE"
     fi
@@ -668,29 +703,32 @@ open_fcp_or_directory() {
 
 
 enable_auto_checkpoint() {
+    # Check if auto checkpoint is enabled
+    if [ -f "$AUTO_CHECKPOINT_FLAG" ] && [ "$(cat "$AUTO_CHECKPOINT_FLAG")" = "disabled" ]; then
+        log_message "Auto checkpoint is disabled due to a previous check-in failure."
+        return
+    fi
 
-# Define the command you want to schedule
-CRON_COMMAND="$SCRIPT_PATH checkpointall"
+    # Define the command you want to schedule
+    CRON_COMMAND="$SCRIPT_PATH checkpointall"
 
-# Define the cron schedule (every 15 minutes)
-CRON_SCHEDULE="*/15 * * * *"
+    # Define the cron schedule (every 15 minutes)
+    CRON_SCHEDULE="*/15 * * * *"
 
-# Combine them into a single cron job entry
-CRON_JOB="$CRON_SCHEDULE $CRON_COMMAND"
+    # Combine them into a single cron job entry
+    CRON_JOB="$CRON_SCHEDULE $CRON_COMMAND"
 
-# Check if the crontab already contains this job
-(crontab -l 2>/dev/null | grep -F "$CRON_COMMAND") >/dev/null 2>&1 || {
-    # If not found, append the new cron job
-    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab - 2>/dev/null
-    display_notification "Autosave Enabled" "UNFLab will autosave your work every 15 minutes."
+    # Check if the crontab already contains this job
+    (crontab -l 2>/dev/null | grep -F "$CRON_COMMAND") >/dev/null 2>&1 || {
+        # If not found, append the new cron job
+        (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab - 2>/dev/null
+        display_notification "Autosave Enabled" "UNFLab will autosave your work every 15 minutes."
+    }
+
+    # Optional: Ensure the script is executable
+    chmod +x "$SCRIPT_PATH"
 
 }
-
-# Optional: Ensure the script is executable
-chmod +x "$SCRIPT_PATH"
-
-}
-
 
 
 
@@ -811,26 +849,37 @@ if $NAVBAR_MODE; then
                 last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
                 # Output project information along with the last checkpoint time
                 echo " ↳ Last Checkpoint: $last_checkpoint"
-
-           # else
-                # last_checkpoint="No checkpoint available"
             fi
 
-
+            # Read the LAST_CHECKIN value from the .CHECKEDOUT file
+            if [ -f "$CHECKEDOUT_FILE" ]; then
+                last_checkin=$(grep 'LAST_CHECKIN=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+                # Output project information along with the last check-in time
+                echo " ↳ Last Check-in: $last_checkin"
+            fi
 
             echo " ↳ Check In \"$folder_name\""
-            #echo " ↳ Go To \"$folder_name\""
             echo " ↳ Quick Save \"$folder_name\""
 
         done
     fi
+
+    # Check if auto check-in is enabled
+    if [ -f "$AUTO_CHECKPOINT_FLAG" ]; then
+        auto_checkpoint_status=$(cat "$AUTO_CHECKPOINT_FLAG")
+        if [ "$auto_checkpoint_status" = "enabled" ]; then
+            echo "(Automatically uploading changes every 15 minutes)"
+        else
+            echo "‼️ Auto save is disabled!"
+        fi
+    fi
+
     echo "----"
     echo "Check Out Another Project"
     echo "----"
     echo "$APP_NAME Version $VERSION"
     echo "Setup"
     echo "----"
-    #log_message "Displayed menu options: checkin, checkout, setup"
     exit 0
 fi
 
