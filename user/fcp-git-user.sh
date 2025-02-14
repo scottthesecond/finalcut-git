@@ -829,12 +829,10 @@ fi
 if $NAVBAR_MODE; then
 
     # Get checked out projects...
-    folders=("$CHECKEDOUT_FOLDER"/*)
-
-    # Check if there are any repositories
-    if [ ${#folders[@]} -eq 0 ]; then
+    if [ -z "$(ls -A "$CHECKEDOUT_FOLDER")" ]; then
         echo "(You do not currently have any projects checked out)"
     else
+        folders=("$CHECKEDOUT_FOLDER"/*)
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
 
@@ -860,7 +858,6 @@ if $NAVBAR_MODE; then
 
             echo " ↳ Check In \"$folder_name\""
             echo " ↳ Quick Save \"$folder_name\""
-
         done
     fi
 
