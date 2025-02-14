@@ -3,7 +3,7 @@ navbar=false
 script=""
 parameter=""
 
-enable_auto_checkpoint
+# enable_auto_checkpoint
 
 
 # Function to parse URL format
