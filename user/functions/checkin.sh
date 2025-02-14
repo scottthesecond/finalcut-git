@@ -2,6 +2,7 @@
 
 # Function to check git connection
 check_git_connection() {
+    log_message
     git remote update > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         handle_error "Failed to connect to the remote repository. Please check your network connection and remote repository settings."
