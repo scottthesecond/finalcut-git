@@ -6,11 +6,14 @@ DATA_FOLDER="$HOME/fcp-git"
 CHECKEDOUT_FOLDER="$DATA_FOLDER/checkedout"
 CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
-LOG_FILE="$DATA_FOLDER/fcp-git.log"
+LOGS_FOLDER="$DATA_FOLDER/logs"
+LOG_FILE="$LOGS_FOLDER/fcpgit-$VERSION-$(date +'%Y-%m-%d').log"
 selected_repo=""
 AUTO_CHECKPOINT_FLAG="$DATA_FOLDER/auto_checkpoint_enabled"
+
+# Create logs folder if it doesn't exist
+mkdir -p "$LOGS_FOLDER"
 
 # Get the full path of the script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
-

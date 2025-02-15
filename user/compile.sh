@@ -7,6 +7,12 @@ FUNCTIONS="$SCRIPT_DIR/functions"
 VERSION="2.0.6"
 NAME="UNFlab"
 
+# Make build directory if it does not exist
+mkdir -p "$SCRIPT_DIR/build"
+
+#Clear out the build directory
+rm -rf "$SCRIPT_DIR/build"/*
+
 # Define the array of script paths
 scripts=(
     "$FUNCTIONS/vars.sh"
@@ -24,7 +30,7 @@ scripts=(
 )
 
 # Define output file name
-output_file="$SCRIPT_DIR/fcp-git-user.sh"
+output_file="$SCRIPT_DIR/build/fcp-git-user.sh"
 
 # Start fresh by creating the file and adding the shebang
 echo "#!/bin/bash" > "$output_file"
@@ -55,17 +61,18 @@ read -p "Build app with Platypus?" choice
 # Check the user's input
 if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
     echo "building..."
-    mkdir -p "$SCRIPT_DIR/build"
 
     OUT_ZIP="$SCRIPT_DIR/build/$NAME $VERSION.zip"
     OUT_APP="$NAME.app"
     #OUT_SB_APP="$NAME-statusbar.app"
 
     #/usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'None'  --interpreter '/bin/bash'  --uniform-type-identifiers 'public.item|public.folder' --uri-schemes 'fcpgit' --quit-after-execution "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
-    /usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --background --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'Status Menu'  --interpreter '/bin/bash'  --script-args '-navbar' --status-item-kind 'Text' --status-item-title 'UNFLab' --uri-schemes 'fcpgit' --status-item-sysfont --status-item-template-icon --uniform-type-identifiers 'public.item|public.folder'  "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
+    /usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --background --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'Status Menu'  --interpreter '/bin/bash'  --script-args '-navbar' --status-item-kind 'Text' --status-item-title 'UNFLab' --uri-schemes 'fcpgit' --status-item-sysfont --status-item-template-icon --uniform-type-identifiers 'public.item|public.folder'  "$SCRIPT_DIR/build/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
   
     cd "$SCRIPT_DIR/build"
     zip -r "$OUT_ZIP" "$OUT_APP"
 
     echo "done."
+
+    open "$SCRIPT_DIR/build/$OUT_APP"
 fi

@@ -24,11 +24,16 @@ move_to_checkedout(){
 }
 
 checkout() {
+
+    log_message "(BEGIN CHECKOUT)"
+    log_message "(CHECKOUT parameters: $1)"
+
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
         selected_repo="$1"
         log_message "Repository passed from command: $selected_repo"
     else
+        log_message "Repository not passed from command.  Prompting user to select..."
         select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
@@ -41,7 +46,7 @@ checkout() {
         return
     fi
 
-   # Check if the repository is available in the CHECKEDIN_FOLDER
+    # Check if the repository is available in the CHECKEDIN_FOLDER
     if [ ! -d "$CHECKEDIN_FOLDER/$selected_repo" ]; then
         log_message "Repository $selected_repo does not exist locally. Cloning..."
         
@@ -49,7 +54,7 @@ checkout() {
         git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || handle_error "Git clone failed for $selected_repo"
         log_message "Repository cloned: $selected_repo"
 
-        # Set the directory writable in CHECKEDOUT_FOLDER and proceed with other actions
+        # Set the directory writable in CHECKEDIN_FOLDER and proceed with other actions
         chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
         log_message "Repository $selected_repo is now writable."
 
@@ -65,33 +70,39 @@ checkout() {
 
         log_message "Running git pull in $selected_repo"
         git pull >> "$LOG_FILE" 2>&1 || cancel_checkout "Git pull failed for $selected_repo"
-
     fi
-
-
-
 
     # Check if the repository is already checked out
     if [ -f "CHECKEDOUT" ] || [ -f ".CHECKEDOUT" ]; then
         if [ -f "CHECKEDOUT" ]; then
-            checked_out_by=$(cat "CHECKEDOUT") #Backwards compatability with old version of unflab that did not use a hidden file
-        elif [ -f  ".CHECKEDOUT" ]; then
+            checked_out_by=$(cat "CHECKEDOUT") # Backwards compatibility with old version of unflab that did not use a hidden file
+        elif [ -f ".CHECKEDOUT" ]; then
             checked_out_by=$(grep 'checked_out_by=' ".CHECKEDOUT" | cut -d '=' -f 2)
             commit_message=$(grep 'commit_message=' ".CHECKEDOUT" | cut -d '=' -f 2)
+            branch_name=$(grep 'branch_name=' ".CHECKEDOUT" | cut -d '=' -f 2)
         fi
 
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
-            
-            log_message "Repository is already checked out by $checked_out_by"
+            log_message "Repository is already checked out by $checked_out_by on branch $branch_name"
             hide_dialog
-            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
+            osascript -e "display dialog \"Repository is already checked out by $checked_out_by on branch $branch_name.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
             exit 1
         fi
-
     else
+        # Create a new branch for the user with a timestamp
+        timestamp=$(date +"%Y%m%d%H%M%S")
+        user_branch="checkout-$CURRENT_USER-$timestamp"
 
-        #Get the commit message
+        # Get the commit message
         commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
+
+        # Set log message with branch name
+        set_log_message() {
+            CURRENT_USER=$(whoami)
+            echo "checked_out_by=$CURRENT_USER" > ".CHECKEDOUT"
+            echo "commit_message=$commit_message" >> ".CHECKEDOUT"
+            echo "branch_name=$user_branch" >> ".CHECKEDOUT"
+        }
 
         set_log_message
 
@@ -100,7 +111,11 @@ checkout() {
         git push >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push CHECKEDOUT file."
         log_message "Repository checked out by $CURRENT_USER"
     fi
-    
+
+    git checkout -b "$user_branch" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to create branch $user_branch"
+    git push -u origin "$user_branch" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push branch $user_branch"
+    log_message "Created and switched to branch $user_branch"
+
     # Move it to CHECKEDOUT_FOLDER after successful pull
     log_message "Moving repo to checkedout folder..."
     move_to_checkedout || cancel_checkout "Couldn't move $selected_repo to the checked out folder"
@@ -112,5 +127,4 @@ checkout() {
     display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
 
     open_fcp_or_directory
-
 }

@@ -12,10 +12,11 @@ handle_error() {
     log_message "ERROR: $error_message"
 
     if [ "$show_dialog" = true ]; then
-        osascript -e "display dialog \"Error: $error_message. See log for details.\" buttons {\"OK\"} default button \"OK\""
+        osascript -e "display dialog \"Error: $error_message.. See log for details.\" buttons {\"Copy Log to Desktop\", \"OK\"} default button \"OK\"" -e "if button returned of result is \"Copy Log to Desktop\" then do shell script \"cp '$LOG_FILE' ~/Desktop/\""
     else
         display_notification "Error" "$error_message" "See log for details."
     fi
+
 
     exit 1
 }

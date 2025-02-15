@@ -74,6 +74,8 @@ checkpoint() {
 # Function: Checkpoint all checked out repositories
 checkpoint_all() {
 
+    log_message "(BEGIN CHECKPOINT_ALL)"
+
     # Check if auto checkpoint is enabled
     if [ -f "$AUTO_CHECKPOINT_FLAG" ] && [ "$(cat "$AUTO_CHECKPOINT_FLAG")" = "disabled" ]; then
         log_message "Auto checkpoint is disabled due to a previous check-in failure."
@@ -106,6 +108,9 @@ checkpoint_all() {
 
         fi
     done
+
+        log_message "(END CHECKPOINT_ALL)"
+
 }
 
 update_checkin_time() {

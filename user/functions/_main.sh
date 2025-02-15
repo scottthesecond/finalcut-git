@@ -1,8 +1,10 @@
+log_message "-----   UNFLAB MAIN LOOP STARTED   -----"
+
 navbar=false
 script=""
 parameter=""
 
-enable_auto_checkpoint
+# enable_auto_checkpoint
 
 
 # Function to parse URL format
@@ -18,11 +20,14 @@ while [[ "$1" != "" ]]; do
   case $1 in
     -navbar)
       navbar=true
+      log_message "(NAVBAR MODE)"
       ;;
     fcpgit://*)
+      log_message "(LAUNCHED VIA URL)"
       parse_url "$1"
       ;;
     checkpointall)
+      log_message "(CHECKPOINTALL)"
       script="checkpointall"
       ;;
     " ↳ Quick Save "*)
@@ -56,7 +61,7 @@ while [[ "$1" != "" ]]; do
   shift
 done
 
-log_message "Navbar: $navbar"
+
 log_message "Script: $script"
 
 # Remove surrounding quotes from the parameter if present
@@ -102,11 +107,11 @@ if $NAVBAR_MODE; then
         for i in "${!folders[@]}"; do
             folder_name=$(basename "${folders[$i]}")
 
-            # Determine the path to the .CHECKEDOUT file
-            CHECKEDOUT_FILE="${folders[$i]}/.CHECKEDOUT"
-            
-            # Output action and folder name together
-            echo "\"$folder_name\""
+                # Determine the path to the .CHECKEDOUT file
+                CHECKEDOUT_FILE="${folders[$i]}/.CHECKEDOUT"
+                
+                # Output action and folder name together
+                echo "\"$folder_name\""
 
             # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
             if [ -f "$CHECKEDOUT_FILE" ]; then
