@@ -112,14 +112,14 @@ if $NAVBAR_MODE; then
             echo "\"$folder_name\""
 
             # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
-            if [ -f "$CHECKEDOUT_FILE" ]; then
-                last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+            #if [ -f "$CHECKEDOUT_FILE" ]; then
+                # last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
                 # Output project information along with the last checkpoint time
-                echo " ↳ Last Checkpoint: $last_checkpoint"
+                #echo " ↳ Last Checkpoint: $last_checkpoint"
 
            # else
                 # last_checkpoint="No checkpoint available"
-            fi
+            #fi
 
 
 
