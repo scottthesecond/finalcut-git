@@ -30,6 +30,8 @@ moveToHiddenCheckinFolder(){
 
 
 commitAndPush() {
+    log_message "(BEGIN COMMITANDPUSH)"
+
     # Get the current date and the user's name
     current_date=$(date +"%Y-%m-%d")
 
@@ -64,14 +66,16 @@ commitAndPush() {
     git push >> "$LOG_FILE" 2>&1 || handle_error "Git push failed for $selected_repo"
     
     log_message "Changes have been successfully checked in and pushed for $selected_repo."
+
+    log_message "(END COMMITANDPUSH)"
+
 }
 
-
-
-
-
-
 checkin() {
+
+    log_message "(BEGIN CHECKOUT)"
+    log_message "(CHECKOUT parameters: $1)"
+
 
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
@@ -94,23 +98,48 @@ checkin() {
         fi
     done
 
+    # Read the branch name from the .CHECKEDOUT file
+    user_branch=$(grep 'branch_name=' "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" | cut -d '=' -f 2)
 
     # Remove checkedout files
-    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" #V1 CHECKEDOUT File (remove once everyone is up-to-date)
-    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" #V2 .CHECKEDOUT File
+    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/CHECKEDOUT" # V1 CHECKEDOUT File (remove once everyone is up-to-date)
+    rm -f "$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT" # V2 .CHECKEDOUT File
+
+    # Debugging: Log the branch name
+    log_message "Branch name read from .CHECKEDOUT file: $user_branch"
+
+    # Handle empty branch name
+    if [ -z "$user_branch" ]; then
+        handle_error "Branch name is empty. Check the .CHECKEDOUT file."
+    fi
+
+    # Push the user's branch to the remote repository
+    git push -u origin "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to push branch $user_branch"
 
     commitAndPush
+
+    # Determine the default branch name
+    default_branch=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+
+    # Switch to the default branch
+    git checkout "$default_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to switch to $default_branch branch"
+
+    # Merge the user's branch into the default branch
+    git merge "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to merge branch $user_branch into $default_branch"
+
+    # Push the changes to the default branch
+    git push origin "$default_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to push changes to $default_branch branch"
+
+    # Delete the user's branch
+    git branch -d "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to delete branch $user_branch"
+    git push origin --delete "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to delete remote branch $user_branch"
 
     moveToHiddenCheckinFolder
 
     hide_dialog
 
-    display_notification "Uploaded changes to $selected_repo." "$selected_repo has been sucessfully checked in."
+    display_notification "Uploaded changes to $selected_repo." "$selected_repo has been successfully checked in."
 
+    log_message "(END CHECKOUT)"
 
-#    osascript -e "display dialog \"Changes have been checked in and pushed for $selected_repo.\" buttons {\"OK\"} default button \"OK\""
-
-    # Set the repository to read-only
-    #echo "Repository $selected_repo is now read-only."
 }
-

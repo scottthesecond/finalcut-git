@@ -1,5 +1,9 @@
 # Function to select a repo using AppleScript
 select_repo() {
+
+    log_message " //// BEGIN SELECT_REPO \\\\"
+
+
     local enable_new="false"
     local folders=("$CHECKEDOUT_FOLDER"/*)
     local prompt_text="Select an existing repository:" # Default prompt
@@ -38,6 +42,7 @@ select_repo() {
 
     # Use AppleScript to display a dialog with the repo options
     selected_repo=$(osascript -e "choose from list {$repo_list} with prompt \"$prompt_text\"")
+    log_message "Selected repo from prompt: $selected_repo"
 
     # Check if the user selected "New" (only if enabled)
     if [ "$selected_repo" == "false" ]; then
@@ -53,4 +58,7 @@ select_repo() {
 
     # Navigate to the selected or newly created repository
     cd "$CHECKEDOUT_FOLDER/$selected_repo"
+
+    log_message "Final selected repo: $selected_repo"
+    log_message " //// END SELECT_REPO \\\\"
 }

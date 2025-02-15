@@ -1,3 +1,4 @@
+log_message "-----   UNFLAB MAIN LOOP STARTED   -----"
 
 navbar=false
 script=""
@@ -19,11 +20,14 @@ while [[ "$1" != "" ]]; do
   case $1 in
     -navbar)
       navbar=true
+      log_message "(NAVBAR MODE)"
       ;;
     fcpgit://*)
+      log_message "(LAUNCHED VIA URL)"
       parse_url "$1"
       ;;
     checkpointall)
+      log_message "(CHECKPOINTALL)"
       script="checkpointall"
       ;;
     " ↳ Quick Save "*)
@@ -57,7 +61,7 @@ while [[ "$1" != "" ]]; do
   shift
 done
 
-log_message "Navbar: $navbar"
+
 log_message "Script: $script"
 
 # Remove surrounding quotes from the parameter if present
@@ -96,39 +100,42 @@ fi
 if $NAVBAR_MODE; then
 
     # Get checked out projects...
-    folders=("$CHECKEDOUT_FOLDER"/*)
+    if [ -d "$CHECKEDOUT_FOLDER" ]; then
+        folders=("$CHECKEDOUT_FOLDER"/*)
 
-    # Check if there are any repositories
-    if [ ${#folders[@]} -eq 0 ]; then
-        echo "(You do not currently have any projects checked out)"
+        # Check if there are any repositories
+        if [ ${#folders[@]} -eq 1 ] && [ ! -e "${folders[0]}" ]; then
+            echo "(You do not currently have any projects checked out)"
+        else
+            for i in "${!folders[@]}"; do
+                folder_name=$(basename "${folders[$i]}")
+
+                # Determine the path to the .CHECKEDOUT file
+                CHECKEDOUT_FILE="${folders[$i]}/.CHECKEDOUT"
+                
+                # Output action and folder name together
+                echo "\"$folder_name\""
+
+                # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
+                #if [ -f "$CHECKEDOUT_FILE" ]; then
+                    # last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+                    # Output project information along with the last checkpoint time
+                    #echo " ↳ Last Checkpoint: $last_checkpoint"
+
+                # else
+                    # last_checkpoint="No checkpoint available"
+                #fi
+
+                echo " ↳ Check In \"$folder_name\""
+                #echo " ↳ Go To \"$folder_name\""
+                echo " ↳ Quick Save \"$folder_name\""
+
+            done
+        fi
     else
-        for i in "${!folders[@]}"; do
-            folder_name=$(basename "${folders[$i]}")
-
-            # Determine the path to the .CHECKEDOUT file
-            CHECKEDOUT_FILE="${folders[$i]}/.CHECKEDOUT"
-            
-            # Output action and folder name together
-            echo "\"$folder_name\""
-
-            # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
-            #if [ -f "$CHECKEDOUT_FILE" ]; then
-                # last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-                # Output project information along with the last checkpoint time
-                #echo " ↳ Last Checkpoint: $last_checkpoint"
-
-           # else
-                # last_checkpoint="No checkpoint available"
-            #fi
-
-
-
-            echo " ↳ Check In \"$folder_name\""
-            #echo " ↳ Go To \"$folder_name\""
-            echo " ↳ Quick Save \"$folder_name\""
-
-        done
+        echo "(You do not currently have any projects checked out)"
     fi
+fi
     echo "----"
     echo "Check Out Another Project"
     echo "----"

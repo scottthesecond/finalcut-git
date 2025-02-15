@@ -7,7 +7,7 @@ CHECKEDOUT_FOLDER="$DATA_FOLDER/checkedout"
 CHECKEDIN_FOLDER="$DATA_FOLDER/.checkedin"
 CONFIG_FILE="$DATA_FOLDER/.config"
 LOGS_FOLDER="$DATA_FOLDER/logs"
-LOG_FILE="$LOGS_FOLDER/fcp-git-$(date +'%Y-%m-%d').log"
+LOG_FILE="$LOGS_FOLDER/fcpgit-$VERSION-$(date +'%Y-%m-%d').log"
 selected_repo=""
 
 # Create logs folder if it doesn't exist
