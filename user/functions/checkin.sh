@@ -73,7 +73,7 @@ commitAndPush() {
 
 checkin() {
 
-    log_message "(BEGIN CHECKOUT)"
+    log_message "(BEGIN CHECKIN)"
     log_message "(CHECKOUT parameters: $1)"
 
 
@@ -132,7 +132,7 @@ checkin() {
 
     # Delete the user's branch
     git branch -d "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to delete branch $user_branch"
-    git push origin --delete "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to delete remote branch $user_branch"
+    git push origin --delete "$user_branch" >> "$LOG_FILE" 2>&1 || log_message "Failed to delete remote branch $user_branch"
 
     moveToHiddenCheckinFolder
 
