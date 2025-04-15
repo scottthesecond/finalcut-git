@@ -20,3 +20,8 @@ Settings.plist
 .fcpcache
 
 **/__Temp
+
+# Apple Stuff
+.DS_Store
+.AppleDouble
+.LSOverride
