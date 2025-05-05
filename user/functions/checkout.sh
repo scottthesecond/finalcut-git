@@ -28,6 +28,29 @@ checkout() {
     log_message "(BEGIN CHECKOUT)"
     log_message "(CHECKOUT parameters: $1)"
 
+    # Create a lock file to prevent multiple simultaneous operations
+    LOCK_FILE="$DATA_FOLDER/.checkout_lock"
+    if [ -f "$LOCK_FILE" ]; then
+        lock_pid=$(cat "$LOCK_FILE")
+        if ps -p "$lock_pid" > /dev/null 2>&1; then
+            log_message "Another checkout operation is in progress (PID: $lock_pid)"
+            osascript -e "display dialog \"Another checkout operation is currently in progress. Please wait for it to complete.\" buttons {\"OK\"} default button \"OK\""
+            exit 1
+        else
+            # Process is not running, remove stale lock
+            rm -f "$LOCK_FILE"
+        fi
+    fi
+
+    # Create lock file with current process ID
+    echo $$ > "$LOCK_FILE"
+
+    # Function to clean up lock file on exit
+    cleanup() {
+        rm -f "$LOCK_FILE"
+    }
+    trap cleanup EXIT
+
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
         selected_repo="$1"
