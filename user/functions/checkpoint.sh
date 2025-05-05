@@ -1,5 +1,15 @@
+#!/bin/bash
 
 
+# Function to check connectivity to the remote repository
+check_connectivity() {
+    # Try to fetch from origin with a short timeout
+    if git fetch origin --quiet --timeout=5 2>/dev/null; then
+        return 0  # Success
+    else
+        return 1  # Failed
+    fi
+}
 
 checkpoint() {
 
@@ -9,6 +19,13 @@ checkpoint() {
         cd "$CHECKEDOUT_FOLDER/$selected_repo"
     else
         select_repo "Which repository do you want to Checkpoint?"
+    fi
+
+    # Check connectivity before proceeding
+    if ! check_connectivity; then
+        log_message "No connectivity to origin for $selected_repo"
+        osascript -e "display dialog \"Unable to connect to the server. Please check your internet connection and try again.\" buttons {\"OK\"} default button \"OK\""
+        return 1
     fi
 
     CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"

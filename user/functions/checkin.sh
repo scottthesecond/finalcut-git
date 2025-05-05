@@ -107,6 +107,13 @@ checkin() {
     else
         select_repo "Which repository do you want to check in?"
     fi
+
+    # Check connectivity before proceeding
+    if ! check_connectivity; then
+        log_message "No connectivity to origin for $selected_repo"
+        osascript -e "display dialog \"Unable to connect to the server. Please check your internet connection and try again.\" buttons {\"OK\"} default button \"OK\""
+        return 1
+    fi
     
     display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
 

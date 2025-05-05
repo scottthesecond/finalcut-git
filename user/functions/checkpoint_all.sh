@@ -16,16 +16,19 @@ checkpoint_all() {
         if [ -d "$folder" ]; then
             selected_repo=$(basename "$folder")
             
-            
+            # Change to the repository directory
+            cd "$CHECKEDOUT_FOLDER/$selected_repo" || continue
+
+            # Check connectivity before proceeding
+            if ! check_connectivity; then
+                log_message "No connectivity to origin for $selected_repo, skipping checkpoint"
+                continue
+            fi
 
             echo "Creating checkpoint for: $selected_repo"
-            #log_message "Creating checkpoint for: $selected_repo"
-            #create_checkpoint "$selected_repo"
-
             update_checkin_time
             commitAndPush
             display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
-
         fi
     done
 
