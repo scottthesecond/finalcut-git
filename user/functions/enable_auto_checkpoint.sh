@@ -1,33 +1,76 @@
 enable_auto_checkpoint() {
-    # Define the command you want to schedule
-    CRON_COMMAND="$SCRIPT_PATH checkpointall"
-
-    # Define the cron schedule (every 15 minutes)
-    CRON_SCHEDULE="*/15 * * * *"
-
-    # Combine them into a single cron job entry
-    CRON_JOB="$CRON_SCHEDULE $CRON_COMMAND"
-
-    # Get current crontab content
-    CURRENT_CRONTAB=$(crontab -l 2>/dev/null)
-
-    # Check if the job already exists
-    if echo "$CURRENT_CRONTAB" | grep -F "$CRON_COMMAND" >/dev/null 2>&1; then
-        log_message "Autosave cron job already exists"
+    # Create the LaunchAgent directory if it doesn't exist
+    LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
+    mkdir -p "$LAUNCH_AGENT_DIR"
+    
+    # Create the plist file
+    PLIST_FILE="$LAUNCH_AGENT_DIR/com.unflab.autosave.plist"
+    
+    # Check if the LaunchAgent already exists
+    if [ -f "$PLIST_FILE" ]; then
+        # Just ensure it's loaded
+        launchctl load "$PLIST_FILE" 2>/dev/null
         return 0
     fi
+    
+    # Create logs directory if it doesn't exist
+    LOG_DIR="$HOME/Library/Logs/UNFlab"
+    mkdir -p "$LOG_DIR"
+    
+    # Create the plist content
+    cat > "$PLIST_FILE" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.unflab.autosave</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$SCRIPT_PATH</string>
+        <string>checkpointall</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>StandardErrorPath</key>
+    <string>$LOG_DIR/autosave.err</string>
+    <key>StandardOutPath</key>
+    <string>$LOG_DIR/autosave.out</string>
+    <key>CFBundleName</key>
+    <string>UNFlab Autosave</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.unflab.autosave</string>
+    <key>CFBundleDisplayName</key>
+    <string>UNFlab Autosave</string>
+    <key>CFBundleGetInfoString</key>
+    <string>UNFlab Automatic Save Service</string>
+</dict>
+</plist>
+EOF
 
-    # Add the new job to the existing crontab
-    if [ -z "$CURRENT_CRONTAB" ]; then
-        echo "$CRON_JOB" | crontab -
+    # Load the LaunchAgent
+    launchctl load "$PLIST_FILE" 2>/dev/null
+    
+    if [ $? -eq 0 ]; then
+        display_notification "Autosave Enabled" "UNFlab will autosave your work every 15 minutes."
     else
-        echo "$CURRENT_CRONTAB
-$CRON_JOB" | crontab -
+        display_notification "Autosave is Disabled." "Failed to enable autosave. Please check permissions."
+        return 1
     fi
+}
 
-    display_notification "Autosave Enabled" "UNFlab will autosave your work every 15 minutes."
-
-    # Optional: Ensure the script is executable
-    chmod +x "$SCRIPT_PATH"
+disable_auto_checkpoint() {
+    PLIST_FILE="$HOME/Library/LaunchAgents/com.unflab.autosave.plist"
+    
+    # Unload the LaunchAgent if it exists
+    if [ -f "$PLIST_FILE" ]; then
+        launchctl unload "$PLIST_FILE" 2>/dev/null
+        rm "$PLIST_FILE"
+        display_notification "Autosave Disabled" "UNFlab autosave has been disabled."
+    fi
 }
 
