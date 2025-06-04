@@ -1,5 +1,8 @@
 # Function to check if any files in the repository have been accessed recently
 check_recent_access() {
+
+    log_message "(BEGIN CHECK_RECENT_ACCESS)"
+
     local repo_path="$CHECKEDOUT_FOLDER/$selected_repo"
     local one_hour_ago=$(date -v-1H +%s)
     local has_recent_access=0
@@ -19,8 +22,10 @@ check_recent_access() {
     done
 
     if [ $has_recent_access -eq 1 ]; then
-        log_message "Repo has been accessed in the last hour – we shouldn't try to auto-checkin; let's checkpoint instead."
+        log_message "Repo has been accessed in the last hour – we shouldn't try to auto-checkin; let's checkpoint instead."
         log_message "Last Accessed: $recent_access_time"
+    else
+        log_message "File has not been accessed in the last hour."
     fi
 
     return $has_recent_access
@@ -46,8 +51,6 @@ update_checkin_time() {
 # Function: Checkpoint all checked out repositories
 checkpoint_all() {
     log_message "(BEGIN CHECKPOINT_ALL)"
-
-    echo "AUTOSAVE SCRIPT RAN at $(date)" >> ~/fcp-git/logs/autosave-debug.log
     
     # Get all checked out repositories
     folders=("$CHECKEDOUT_FOLDER"/*)
@@ -73,9 +76,14 @@ checkpoint_all() {
                 continue
             fi
 
-            # Check if any files are open
-            if ! check_open_files && ! check_recent_access; then
-                log_message "No files open and no recent file access in $selected_repo, performing automatic checkin."
+            # Check if any files are open and check recent access
+            check_open_files
+            open_files_result=$?
+            check_recent_access
+            recent_access_result=$?
+
+            if [ $open_files_result -eq 1 ] && [ $recent_access_result -eq 0 ]; then
+                log_message "No files open and no recent file access in $selected_repo, performing automatic checkin instead of checkpoint."
                 # Perform full checkin instead of checkpoint
                 checkin "$selected_repo"
                 # Skip to next repository since this one is now checked in

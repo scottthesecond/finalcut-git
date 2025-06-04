@@ -35,8 +35,8 @@ while [[ "$1" != "" ]]; do
       script="checkpointall"
       ;;
     "Quick Save")
-      script="checkpoint"
-      parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
+      log_message "(Manual CHECKPOINTALL) (Quick Save)"
+      script="checkpointall"
       ;;
     " ↳ Check In "*)
       script="checkin"
