@@ -7,25 +7,35 @@ check_recent_access() {
     local one_hour_ago=$(date -v-1H +%s)
     local has_recent_access=0
     local recent_access_time=0
+    local temp_file=$(mktemp)
 
-    # Find all files in the repository (excluding .git directory)
-    find "$repo_path" -type f -not -path "*/\.*" -print0 | while IFS= read -r -d '' file; do
-        # Get the last access time of the file
-        access_time=$(stat -f "%a" "$file")
+    # Find all files in the repository (excluding .git directory) and store their access times
+    find "$repo_path" -type f -not -path "*/\.*" -exec stat -f "%a" {} \; > "$temp_file"
 
-        # If any file has been accessed in the last hour, set flag and break
+    # Read the access times and find the most recent
+    while IFS= read -r access_time; do
+        # If any file has been accessed in the last hour, set flag
         if [ "$access_time" -gt "$one_hour_ago" ]; then
             has_recent_access=1
             recent_access_time=$access_time
-            break
         fi
-    done
+    done < "$temp_file"
+
+    # Clean up temp file
+    rm "$temp_file"
+
+    # Get the most recent access time from all files
+    most_recent_time=$(find "$repo_path" -type f -not -path "*/\.*" -exec stat -f "%a" {} \; | sort -nr | head -n1)
+
+    # Convert most recent time to readable format
+    readable_time=$(date -r "$most_recent_time" "+%Y-%m-%d %H:%M:%S")
 
     if [ $has_recent_access -eq 1 ]; then
         log_message "Repo has been accessed in the last hour – we shouldn't try to auto-checkin; let's checkpoint instead."
-        log_message "Last Accessed: $recent_access_time"
+        log_message "Last Accessed: $readable_time"
     else
         log_message "File has not been accessed in the last hour."
+        log_message "Most Recent Access: $readable_time"
     fi
 
     return $has_recent_access
