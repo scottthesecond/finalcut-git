@@ -134,7 +134,7 @@ if $NAVBAR_MODE; then
                 fi
 
                 echo " ↳ Check In \"$folder_name\""
-                echo " ↳ Go To \"$folder_name\""
+                # echo " ↳ Go To \"$folder_name\""
                 #echo " ↳ Quick Save \"$folder_name\""
 
             done
