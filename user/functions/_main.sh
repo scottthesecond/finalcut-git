@@ -1,8 +1,9 @@
-log_message "-----   UNFLAB MAIN LOOP STARTED   -----"
+#log_message "-----   $APP_NAME ($VERSION) MAIN LOOP STARTED   -----"
 
 navbar=false
 script=""
 parameter=""
+SILENT_MODE=false
 
 enable_auto_checkpoint
 
@@ -20,7 +21,10 @@ while [[ "$1" != "" ]]; do
   case $1 in
     -navbar)
       navbar=true
-      log_message "(NAVBAR MODE)"
+      # log_message "(NAVBAR MODE)"
+      ;;
+    --silent)
+      SILENT_MODE=true
       ;;
     fcpgit://*)
       log_message "(LAUNCHED VIA URL)"
@@ -30,7 +34,7 @@ while [[ "$1" != "" ]]; do
       log_message "(CHECKPOINTALL)"
       script="checkpointall"
       ;;
-    " ↳ Quick Save "*)
+    "Quick Save")
       script="checkpoint"
       parameter=$(echo "$1" | sed 's/ ↳ Quick Save //')
       ;;
@@ -68,6 +72,9 @@ log_message "Script: $script"
 parameter=$(echo "$parameter" | tr -d '"')
 
 log_message "Parameter: $parameter"
+
+# Export SILENT_MODE for child scripts
+export SILENT_MODE
 
 if [ -n "$script" ]; then
   case $script in
@@ -117,14 +124,14 @@ if $NAVBAR_MODE; then
                 echo "\"$folder_name\""
 
                 # Read the LAST_CHECKPOINT value from the .CHECKEDOUT file
-                #if [ -f "$CHECKEDOUT_FILE" ]; then
-                    # last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-                    # Output project information along with the last checkpoint time
-                    #echo " ↳ Last Checkpoint: $last_checkpoint"
+                if [ -f "$CHECKEDOUT_FILE" ]; then
+                    last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+                    #Output project information along with the last checkpoint time
+                    echo " ↳ Last Autosave: $last_checkpoint"
 
                 # else
                     # last_checkpoint="No checkpoint available"
-                #fi
+                fi
 
                 echo " ↳ Check In \"$folder_name\""
                 echo " ↳ Go To \"$folder_name\""
@@ -140,6 +147,7 @@ fi
     echo "Check Out Another Project"
     echo "----"
     echo "$APP_NAME Version $VERSION"
+    echo "Quick Save"
     echo "Setup"
     echo "----"
     #log_message "Displayed menu options: checkin, checkout, setup"

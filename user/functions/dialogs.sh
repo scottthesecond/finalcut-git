@@ -4,6 +4,11 @@ display_dialog_timed() {
   local DIALOG_TEXT="$2"
   local DISMISS_TEXT="$3"
 
+  # Skip dialog if in silent mode
+  if [ "$SILENT_MODE" = true ]; then
+    return
+  fi
+
   # Run AppleScript in the background
   osascript <<EOF &
 set dialogTimeout to 60
@@ -30,6 +35,11 @@ display_notification() {
   local TITLE="$1"
   local MESSAGE="$2"
   local SUBTITLE="$3"
+
+  # Skip notification if in silent mode
+  if [ "$SILENT_MODE" = true ]; then
+    return
+  fi
 
   osascript <<EOF
 display notification "$MESSAGE" with title "$TITLE" subtitle "$SUBTITLE"

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Function to check if files in the repository are open, excluding certain processes
 check_open_files() {
     open_files=$(lsof +D "$CHECKEDOUT_FOLDER/$selected_repo" | grep -v "^COMMAND" | grep -vE "(bash|lsof|awk|grep|mdworker_|osascript)")

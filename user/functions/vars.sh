@@ -1,4 +1,4 @@
-#!/bin/bash
+
 
 #Variables
 DATA_FOLDER="$HOME/fcp-git"
@@ -16,3 +16,12 @@ mkdir -p "$LOGS_FOLDER"
 # Get the full path of the script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
+
+# For running from the command line
+BASH_SCRIPT_PATH="${SCRIPT_DIR}/fcp-git-user.sh"
+
+echo "" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+echo "[ $APP_NAME ($VERSION) START: $0 Args: $* ]" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"

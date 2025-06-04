@@ -1,6 +1,3 @@
-#!/bin/bash
-
-
 # Function to check connectivity to the remote repository
 check_connectivity() {
     # Try to fetch from origin with a simple check
