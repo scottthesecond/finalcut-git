@@ -73,9 +73,23 @@ if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
 
     OUT_ZIP="$SCRIPT_DIR/build/$NAME $VERSION.zip"
     OUT_APP="$NAME.app"
-    #OUT_SB_APP="$NAME-statusbar.app"
+    APPLICATIONS_DIR="/Applications"
 
-    #/usr/local/bin/platypus --app-icon "$SCRIPT_DIR/app/AppIcon.icns"  --name "$NAME" --app-version "$VERSION" --author "Unnamed Media" --interface-type 'None'  --interpreter '/bin/bash'  --uniform-type-identifiers 'public.item|public.folder' --uri-schemes 'fcpgit' --quit-after-execution "$SCRIPT_DIR/fcp-git-user.sh" "$SCRIPT_DIR/build/$OUT_APP"
+    # Check if the app is running and quit it
+    if pgrep -f "$NAME.app" > /dev/null; then
+        echo "Quitting existing $NAME application..."
+        pkill -f "$NAME.app"
+        # Give it a moment to quit
+        sleep 2
+    fi
+
+    # Remove existing app from Applications if it exists
+    if [ -d "$APPLICATIONS_DIR/$OUT_APP" ]; then
+        echo "Removing existing $NAME from Applications..."
+        rm -rf "$APPLICATIONS_DIR/$OUT_APP"
+    fi
+
+    # Build the app with Platypus
     /usr/local/bin/platypus \
         --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
         --background \
@@ -97,6 +111,14 @@ if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
   
     cd "$SCRIPT_DIR/build"
     zip -r "$OUT_ZIP" "$OUT_APP"
+
+    # Copy the new app to Applications
+    echo "Copying $NAME to Applications..."
+    cp -R "$OUT_APP" "$APPLICATIONS_DIR/"
+
+    # Launch the new app
+    echo "Launching $NAME..."
+    open "$APPLICATIONS_DIR/$OUT_APP"
 
     echo "done."
 
