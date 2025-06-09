@@ -89,7 +89,11 @@ checkout() {
         cd "$CHECKEDIN_FOLDER/$selected_repo"
 
         log_message "Running git pull in $selected_repo"
-        git pull >> "$LOG_FILE" 2>&1 || cancel_checkout "Git pull failed for $selected_repo"
+        if ! git pull >> "$LOG_FILE" 2>&1; then
+            # If pull fails, handle the conflict
+            handle_git_conflict "$selected_repo"
+            return
+        fi
     fi
 
     # Check if the repository is already checked out

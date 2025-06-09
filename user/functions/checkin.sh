@@ -1,5 +1,3 @@
-
-
 # Function to escape special characters for osascript
 escape_for_applescript() {
     echo "$1" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed "s/'/\\'/g"
@@ -82,7 +80,19 @@ checkin() {
     # Push the user's branch to the remote repository
     # git push -u origin "$user_branch" >> "$LOG_FILE" 2>&1 || handle_error "Failed to push branch $user_branch"
 
+    # Try to commit and push
     commitAndPush
+    push_status=$?
+    
+    if [ $push_status -eq 1 ]; then
+        # If push fails with a conflict, handle it
+        handle_git_conflict "$selected_repo"
+        return
+    elif [ $push_status -eq 2 ]; then
+        # If there's another type of error, show a generic error
+        handle_error "There was an error while trying to sync your changes. Please check the log for details."
+        return
+    fi
 
     # Determine the default branch name
     # default_branch=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)

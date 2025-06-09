@@ -21,6 +21,7 @@ scripts=(
     "$FUNCTIONS/select_repo.sh"
     "$FUNCTIONS/GIT Operations/checkConnectivity.sh"
     "$FUNCTIONS/GIT Operations/commitAndPush.sh"
+    "$FUNCTIONS/GIT Operations/conflict.sh"
     "$FUNCTIONS/Filesystem Operations/checkOpenFiles.sh"
     "$FUNCTIONS/Filesystem Operations/checkRecentAccess.sh"
     "$FUNCTIONS/Filesystem Operations/move.sh"
