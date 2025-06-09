@@ -19,9 +19,6 @@ cancel_checkout() {
 
 }
 
-move_to_checkedout(){
-    mv "$CHECKEDIN_FOLDER/$selected_repo" "$CHECKEDOUT_FOLDER/$selected_repo"
-}
 
 checkout() {
 
