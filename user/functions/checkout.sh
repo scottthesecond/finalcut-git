@@ -114,7 +114,7 @@ checkout() {
     else
         # Create a new branch for the user with a timestamp
         timestamp=$(date +"%Y%m%d%H%M%S")
-        user_branch="checkout-$CURRENT_USER-$timestamp"
+        # user_branch="checkout-$CURRENT_USER-$timestamp"
 
         # Get the commit message
         commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
@@ -124,7 +124,7 @@ checkout() {
             CURRENT_USER=$(whoami)
             echo "checked_out_by=$CURRENT_USER" > ".CHECKEDOUT"
             echo "commit_message=$commit_message" >> ".CHECKEDOUT"
-            echo "branch_name=$user_branch" >> ".CHECKEDOUT"
+            # echo "branch_name=$user_branch" >> ".CHECKEDOUT"
         }
 
         set_log_message
@@ -135,9 +135,9 @@ checkout() {
         log_message "Repository checked out by $CURRENT_USER"
     fi
 
-    git checkout -b "$user_branch" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to create branch $user_branch"
-    git push -u origin "$user_branch" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push branch $user_branch"
-    log_message "Created and switched to branch $user_branch"
+    # git checkout -b "$user_branch" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to create branch $user_branch"
+    # git push -u origin "$user_branch" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push branch $user_branch"
+    # log_message "Created and switched to branch $user_branch"
 
     # Move it to CHECKEDOUT_FOLDER after successful pull
     log_message "Moving repo to checkedout folder..."
