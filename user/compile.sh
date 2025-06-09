@@ -19,6 +19,8 @@ scripts=(
     "$FUNCTIONS/logs.sh"
     "$FUNCTIONS/setup.sh"
     "$FUNCTIONS/select_repo.sh"
+    "$FUNCTIONS/GIT Operations/checkConnectivity.sh"
+    "$FUNCTIONS/GIT Operations/commitAndPush.sh"
     "$FUNCTIONS/checkin.sh"
     "$FUNCTIONS/checkpoint.sh"
     "$FUNCTIONS/checkpoint_all.sh"
