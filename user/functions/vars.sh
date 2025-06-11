@@ -9,6 +9,8 @@ LOGS_FOLDER="$DATA_FOLDER/logs"
 LOG_FILE="$LOGS_FOLDER/fcpgit-$VERSION-$(date +'%Y-%m-%d').log"
 selected_repo=""
 
+CURRENT_USER=$(whoami)
+
 # Create logs folder if it doesn't exist
 mkdir -p "$LOGS_FOLDER"
 

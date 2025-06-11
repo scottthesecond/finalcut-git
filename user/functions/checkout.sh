@@ -1,5 +1,4 @@
 set_log_message() {
-    CURRENT_USER=$(whoami)
 
     echo "checked_out_by=$CURRENT_USER" > ".CHECKEDOUT"
     echo "commit_message=$commit_message" >> ".CHECKEDOUT"
@@ -82,13 +81,23 @@ checkout() {
     else
         # If cached, make it writable and perform git pull in CHECKEDIN_FOLDER
         log_message "Repository $selected_repo is cached, but not checked out."
-        log_message "Making repository $selected_repo writable"
         
+        log_message "Making repository $selected_repo writable"
         chmod -R u+w "$CHECKEDIN_FOLDER/$selected_repo" || cancel_checkout "Failed to make repository $selected_repo writable"
 
         cd "$CHECKEDIN_FOLDER/$selected_repo"
 
         log_message "Running git pull in $selected_repo"
+        # Check if we're ahead of origin
+        if git status | grep -q "Your branch is ahead of 'origin/master'"; then
+            log_message "Local branch is ahead of origin, attempting to push first"
+            if ! git push >> "$LOG_FILE" 2>&1; then
+                # If push fails, handle the conflict
+                handle_git_conflict "$selected_repo"
+                return
+            fi
+        fi
+        
         if ! git pull >> "$LOG_FILE" 2>&1; then
             # If pull fails, handle the conflict
             handle_git_conflict "$selected_repo"
@@ -103,14 +112,42 @@ checkout() {
         elif [ -f ".CHECKEDOUT" ]; then
             checked_out_by=$(grep 'checked_out_by=' ".CHECKEDOUT" | cut -d '=' -f 2)
             commit_message=$(grep 'commit_message=' ".CHECKEDOUT" | cut -d '=' -f 2)
-            branch_name=$(grep 'branch_name=' ".CHECKEDOUT" | cut -d '=' -f 2)
+            # branch_name=$(grep 'branch_name=' ".CHECKEDOUT" | cut -d '=' -f 2)
         fi
 
+            log_message "Current User: $CURRENT_USER"
+            log_message "Checekd out by: $checked_out_by"
+
+
         if [ "$checked_out_by" != "$CURRENT_USER" ]; then
-            log_message "Repository is already checked out by $checked_out_by on branch $branch_name"
+            log_message "Repository is already checked out by $checked_out_by."
             hide_dialog
-            osascript -e "display dialog \"Repository is already checked out by $checked_out_by on branch $branch_name.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
+            osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
             exit 1
+        else
+            log_message "Repository is already checked out by current user ($CURRENT_USER), proceeding with checkout"
+            
+            # Check if we're ahead of origin before trying to update .CHECKEDOUT
+            if git status | grep -q "Your branch is ahead of 'origin/master'"; then
+                log_message "Local branch is ahead of origin, attempting to push first"
+                if ! git push >> "$LOG_FILE" 2>&1; then
+                    # If push fails, handle the conflict
+                    handle_git_conflict "$selected_repo"
+                    return
+                fi
+            fi
+
+            # Get the commit message
+            commit_message=$(osascript -e 'display dialog "Let your teammates know why you have the library checked out:" default answer "" with title "Checkout Log"' -e 'text returned of result')
+
+            # Update the .CHECKEDOUT file
+            echo "checked_out_by=$CURRENT_USER" > ".CHECKEDOUT"
+            echo "commit_message=$commit_message" >> ".CHECKEDOUT"
+
+            git add . >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to add CHECKEDOUT file."
+            git commit -m "Checked out by $CURRENT_USER: $commit_message" >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to commit CHECKEDOUT file."
+            git push >> "$LOG_FILE" 2>&1 || cancel_checkout "Failed to push CHECKEDOUT file."
+            log_message "Repository checked out by $CURRENT_USER"
         fi
     else
         # Create a new branch for the user with a timestamp

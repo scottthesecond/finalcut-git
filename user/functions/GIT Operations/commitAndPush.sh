@@ -14,6 +14,15 @@ commitAndPush() {
         commit_message="$user_name: $commit_message_user"
     fi
 
+    # Check if we're ahead of origin
+    if git status | grep -q "Your branch is ahead of 'origin/master'"; then
+        log_message "Local branch is ahead of origin, attempting to push first"
+        if ! git push >> "$LOG_FILE" 2>&1; then
+            log_message "Failed to push ahead commits"
+            return 1  # Treat this as a conflict
+        fi
+    fi
+
     # Check for unstaged changes
     log_message "Checking for unstaged changes in $selected_repo"
     if git diff-index --quiet HEAD --; then
@@ -25,7 +34,6 @@ commitAndPush() {
         log_message "No connectivity to origin for $selected_repo, skipping checkpoint."
         return 2
     fi
-
 
     # Stage all changes
     log_message "Staging changes in $selected_repo"
