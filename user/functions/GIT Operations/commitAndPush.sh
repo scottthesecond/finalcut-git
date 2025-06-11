@@ -5,13 +5,17 @@ commitAndPush() {
     current_date=$(date +"%Y-%m-%d")
     user_name=$(whoami)
 
-    # Get Commit Message
-    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-    
-    if [ -z "$commit_message_user" ]; then
-        commit_message="Commit on $current_date by $user_name"
+    # Get Commit Message - either from parameter or from CHECKEDOUT file
+    if [ -n "$1" ]; then
+        commit_message="$1"
     else
-        commit_message="$user_name: $commit_message_user"
+        commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+        
+        if [ -z "$commit_message_user" ]; then
+            commit_message="Commit on $current_date by $user_name"
+        else
+            commit_message="$user_name: $commit_message_user"
+        fi
     fi
 
     # Check if we're ahead of origin

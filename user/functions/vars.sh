@@ -11,6 +11,11 @@ selected_repo=""
 
 CURRENT_USER=$(whoami)
 
+# Return code constants
+readonly RC_SUCCESS=0
+readonly RC_ERROR=1
+readonly RC_CANCEL=2
+
 # Create logs folder if it doesn't exist
 mkdir -p "$LOGS_FOLDER"
 

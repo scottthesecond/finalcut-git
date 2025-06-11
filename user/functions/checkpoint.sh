@@ -1,80 +1,41 @@
-
-
+# Function to create a checkpoint for a repository
+# Parameters:
+#   $1: repo_name - Optional repository name to checkpoint
+# Returns:
+#   0: Success
+#   1: Error
+#   2: User canceled
 checkpoint() {
+    log_message "(BEGIN CHECKPOINT)"
+    log_message "(CHECKPOINT parameters: $1)"
+
+    # Create operation lock
+    if ! create_operation_lock "checkpoint"; then
+        return $RC_ERROR
+    fi
 
     # Check if the repository is passed as an argument
     if [ -n "$1" ]; then
         selected_repo="$1"
-        cd "$CHECKEDOUT_FOLDER/$selected_repo"
+        log_message "Repository passed from command: $selected_repo"
+        if ! cd "$CHECKEDOUT_FOLDER/$selected_repo"; then
+            log_message "Error: Failed to change to repository directory: $CHECKEDOUT_FOLDER/$selected_repo"
+            return $RC_ERROR
+        fi
     else
-        select_repo "Which repository do you want to Checkpoint?"
+        select_repo "Which repository do you want to checkpoint?"
+    fi
+    
+    display_dialog_timed "Syncing Project" "Uploading your changes to $selected_repo to the server...." "Hide"
+
+    # Handle the repository operation
+    if ! handle_repo_operation "$OP_CHECKPOINT" "$selected_repo" "" "false"; then
+        log_message "Error: Failed to handle repository operation"
+        return $RC_ERROR
     fi
 
-    # Check connectivity before proceeding
-    if ! check_connectivity; then
-        log_message "No connectivity to origin for $selected_repo"
-        osascript -e "display dialog \"Unable to connect to the server. Please check your internet connection and try again.\" buttons {\"OK\"} default button \"OK\""
-        return 1
-    fi
-
-    CHECKEDOUT_FILE="$CHECKEDOUT_FOLDER/$selected_repo/.CHECKEDOUT"
-
-    commit_message_user=""
-    commit_message_user=$(grep 'commit_message=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-
-    log_message "Current commit message: $commit_message_user"
-
-    update_checkin_time
-
-    result=$(osascript -e "display dialog \"What did you change so far?\nI'll sync the project to the server (It'll stay checked out) with the log message below.\n\nIf you'll be working on something different going forward and would like to change your log message for autosaves after this, use Checkpoint w/ New Log Message.\" default answer \"$commit_message_user\" with title \"New Checkpoint\" buttons {\"Cancel\", \"Checkpoint\", \"Checkpoint and Change Message\"} default button \"Checkpoint\"")
-    
-    log_message "Dialog Result: $result"
-    
-        # Parse button clicked and commit message using sed
-        button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
-        commit_message=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
-
-        # Log the parsed values for debugging
-        log_message "Button clicked: $button_clicked"
-        log_message "Commit message: $commit_message"
-
-    set_log_message
-    
-    if [ "$button_clicked" = "Checkpoint" ]; then
-
-        
-         display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
-
-         commitAndPush
-         display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
-         hide_dialog
-        # create_checkpoint
-
-        # Code to execute when confirmed
-        log_message "Confirmed with message: $commit_message"
-        # Add your logic here for when the user confirms
-    elif [ "$button_clicked" = "CheckpointandChangeMessage" ]; then
-        
-        nextResult=$(osascript -e "display dialog \"What are you working on now?\n\nI'll use this for autosaves going forward\" default answer \"$commit_message\" with title \"Checkpoint Message\" buttons {\"OK\"} default button \"OK\"")
-
-        display_dialog_timed "Creating Checkpoint..." "Uploading your changes to $selected_repo to the server...." "Hide"
-        commitAndPush
-        
-        commit_message=$(echo "$nextResult" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
-        set_log_message
-
-        display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created sucessfully."
-        hide_dialog
-
-        log_message "Checkpoint Created and message changed to: $commit_message"
-
-    else
-        # Code to execute when canceled
-        log_message "User canceled"
-        # Add your logic here for when the user cancels
-    fi
-
-
-
-
+    hide_dialog
+    display_notification "Uploaded changes to $selected_repo." "A checkpoint for $selected_repo has been created successfully."
+    log_message "(END CHECKPOINT)"
+    return $RC_SUCCESS
 }

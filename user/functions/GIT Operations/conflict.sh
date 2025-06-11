@@ -16,11 +16,21 @@ handle_git_conflict() {
     sleep 2  # Give it a moment to quit
     
     # Move current version to backup
-    mv "$CHECKEDOUT_FOLDER/$repo_name" "$backup_path"
+    log_message "Moving current version to backup at $backup_path..."
+    if ! mv "$CHECKEDOUT_FOLDER/$repo_name" "$backup_path"; then
+        log_message "ERROR: Failed to create backup at $backup_path"
+        osascript -e "display dialog \"Failed to create backup. Please contact support.\" buttons {\"OK\"} default button \"OK\""
+        return 1
+    fi
     
     # Use the normal checkout procedure to get a fresh copy
     log_message "Getting fresh copy of $repo_name using normal checkout procedure..."
-    checkout "$repo_name"
+    if ! checkout "$repo_name"; then
+        log_message "ERROR: Failed to checkout fresh copy. Restoring from backup..."
+        mv "$backup_path" "$CHECKEDOUT_FOLDER/$repo_name"
+        osascript -e "display dialog \"Failed to get fresh copy. Your original version has been restored.\" buttons {\"OK\"} default button \"OK\""
+        return 1
+    fi
     
-    log_message "Moved conflicting version to $backup_path and pulled fresh copy"
+    log_message "Successfully moved conflicting version to $backup_path and pulled fresh copy"
 }

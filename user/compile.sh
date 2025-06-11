@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="2.1.1b-2"
+VERSION="2.2a"
 NAME="UNFlab"
 
 # Make build directory if it does not exist
@@ -22,6 +22,9 @@ scripts=(
     "$FUNCTIONS/GIT Operations/checkConnectivity.sh"
     "$FUNCTIONS/GIT Operations/commitAndPush.sh"
     "$FUNCTIONS/GIT Operations/conflict.sh"
+    "$FUNCTIONS/GIT Operations/checkedout.sh"
+    "$FUNCTIONS/GIT Operations/lock.sh"
+    "$FUNCTIONS/GIT Operations/repo_operations.sh"
     "$FUNCTIONS/Filesystem Operations/checkOpenFiles.sh"
     "$FUNCTIONS/Filesystem Operations/checkRecentAccess.sh"
     "$FUNCTIONS/Filesystem Operations/move.sh"
