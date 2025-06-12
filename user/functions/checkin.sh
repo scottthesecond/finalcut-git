@@ -35,10 +35,13 @@ checkin() {
 
     # Get commit message, using the saved message as default
     commit_message=$(get_commit_message "" "Check-in Log" "Let your teammates know what changes you made:" "$selected_repo")
-    if [ $? -eq $RC_CANCEL ]; then
+    commit_status=$?
+    log_message "$commit_status"
+
+    if [ $commit_status -eq $RC_CANCEL ]; then
         log_message "User canceled check-in"
         return $RC_CANCEL
-    elif [ $? -ne $RC_SUCCESS ]; then
+    elif [ $commit_status -ne $RC_SUCCESS ]; then
         log_message "Error: Failed to get commit message"
         return $RC_ERROR
     fi

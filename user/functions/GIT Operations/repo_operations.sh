@@ -59,11 +59,11 @@ handle_repo_operation() {
         remove_checkedout_file "$CHECKEDOUT_FOLDER/$repo_name"
     fi
     
-    # For checkpoints, use the saved commit message
+    # For checkpoints or checkpoint_all operations, use the saved commit message
     if [ "$operation" = "$OP_CHECKPOINT" ] || [ "$operation" = "$OP_CHECKPOINT_ALL" ]; then
         commitAndPush
     else
-        # For checkin, use the provided commit message
+        # For regular checkin, use the provided commit message
         if [ -n "$commit_message" ]; then
             commitAndPush "$commit_message"
         else
@@ -74,7 +74,7 @@ handle_repo_operation() {
     
     if [ $push_status -eq 1 ]; then
         # If push fails with a conflict, handle it
-        handle_git_conflict "$repo_name"
+        handle_git_conflict "$CHECKEDOUT_FOLDER/$repo_name"
         return $RC_ERROR
     elif [ $push_status -eq 2 ]; then
         # If there's another type of error, show a generic error
@@ -118,6 +118,18 @@ get_commit_message() {
         if [ -f "$checkedout_file" ]; then
             default_message=$(grep 'commit_message=' "$checkedout_file" | cut -d '=' -f 2)
             log_message "Found default commit message from .CHECKEDOUT: $default_message"
+        fi
+    fi
+    
+    # In silent mode, just return the default message if we have one
+    if [ "$SILENT_MODE" = true ]; then
+        if [ -n "$default_message" ]; then
+            echo "[Automatic Checkin] $default_message"
+            return $RC_SUCCESS
+        else
+            # If no default message in silent mode, use a generic one
+            echo "[Automatic Checkin]"
+            return $RC_SUCCESS
         fi
     fi
     

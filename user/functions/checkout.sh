@@ -54,41 +54,69 @@ check_repo_status() {
 #   1: Error
 prepare_repo_for_checkout() {
     local repo_path="$1"
+    local status=$RC_SUCCESS
+    
+    log_message "(BEGIN PREPARE_REPO_FOR_CHECKOUT)"
+    log_message "Preparing repository at path: $repo_path"
     
     # Make repository writable
-    chmod -R u+w "$repo_path" || return 1
-    cd "$repo_path" || return 1
+    log_message "Making repository writable..."
+    if ! chmod -R u+w "$repo_path"; then
+        log_message "Error: Failed to make repository writable"
+        return $RC_ERROR
+    fi
+    
+    # Change to repository directory
+    log_message "Changing to repository directory..."
+    if ! cd "$repo_path"; then
+        log_message "Error: Failed to change to repository directory"
+        return $RC_ERROR
+    fi
     
     # Handle any pending changes
+    log_message "Checking for pending changes..."
     if git status | grep -q "Your branch is ahead of 'origin/master'"; then
         log_message "Local branch is ahead of origin, attempting to push first"
-        if ! git push >> "$LOG_FILE" 2>&1; then
-            handle_git_conflict "$selected_repo"
-            return 1
+        push_output=$(git push 2>&1)
+        push_status=$?
+        if [ $push_status -ne 0 ]; then
+            log_message "Error: Failed to push ahead commits"
+            log_message "Push output: $push_output"
+            handle_git_conflict "$repo_path"
+            return $RC_ERROR
         fi
     fi
     
     # Pull latest changes
-    if ! git pull >> "$LOG_FILE" 2>&1; then
-        handle_git_conflict "$selected_repo"
-        return 1
+    log_message "Pulling latest changes..."
+    pull_output=$(git pull 2>&1)
+    pull_status=$?
+    if [ $pull_status -ne 0 ]; then
+        log_message "Error: Failed to pull latest changes"
+        log_message "Pull output: $pull_output"
+        handle_git_conflict "$repo_path"
+        return $RC_ERROR
     fi
     
     # Verify repository is still available after pull
+    log_message "Verifying repository status..."
     if [ -f "CHECKEDOUT" ] || [ -f ".CHECKEDOUT" ]; then
         local status=$(get_checkedout_status "$repo_path")
         if [ -n "$status" ]; then
             IFS='|' read -r checked_out_by commit_message last_commit <<< "$status"
             if [ "$checked_out_by" != "$CURRENT_USER" ]; then
-                log_message "Repository is already checked out by $checked_out_by."
+                log_message "Repository is already checked out by $checked_out_by"
+                log_message "Checkout reason: $commit_message"
                 hide_dialog
                 osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
-                return 1
+                return $RC_ERROR
             fi
         fi
     fi
     
-    return 0
+    log_message "Repository prepared successfully"
+    log_message "(END PREPARE_REPO_FOR_CHECKOUT)"
+    return $RC_SUCCESS
 }
 
 # Main checkout function

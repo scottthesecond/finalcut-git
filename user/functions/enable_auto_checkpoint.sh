@@ -1,27 +1,15 @@
 enable_auto_checkpoint() {
+    log_message "(BEGIN ENABLE_AUTO_CHECKPOINT)"
+    
     # Create the LaunchAgent directory if it doesn't exist
     LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
     mkdir -p "$LAUNCH_AGENT_DIR"
     
-    # Create the plist file
+    # Define the plist file path
     PLIST_FILE="$LAUNCH_AGENT_DIR/com.unflab.autosave.plist"
     
-    # Check if the LaunchAgent already exists
-    if [ -f "$PLIST_FILE" ]; then
-        # Just ensure it's loaded
-
-            #UPDATE: This was borking it. Fuck my fucking face.  Goddamn ai vibe coding bullshit.  learned a valuable lesson here about trusting goddamn cursor lmao
-
-   #     launchctl unload "$PLIST_FILE" 2>/dev/null
-   #     launchctl load "$PLIST_FILE" 2>/dev/null
-        return 0
-    fi
-    
-    
-    # Create the plist content
-
-    cat > "$PLIST_FILE" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
+    # Store the plist content in a variable
+    PLIST_CONTENT='<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -31,7 +19,7 @@ enable_auto_checkpoint() {
 
         <key>ProgramArguments</key>
         <array>
-            <string>/Applications/UNFlab.app/Contents/Resources/fcp-git-user.sh</string>
+            <string>'"$BASH_SCRIPT_PATH"'</string>
             <string>checkpointall</string>
             <string>--silent</string>
         </array>
@@ -47,82 +35,51 @@ enable_auto_checkpoint() {
         <key>StandardErrorPath</key>
         <string>/tmp/unflab.err</string>
     </dict>
-</plist>
-EOF
-    
-#     cat > "$PLIST_FILE" << EOF
-# <?xml version="1.0" encoding="UTF-8"?>
-# <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-# <plist version="1.0">
-# <dict>
-#     <key>Label</key>
-#     <string>com.unflab.autosave</string>
-#     <key>ProgramArguments</key>
-#     <array>
-#         <string>$BASH_SCRIPT_PATH</string>
-#         <string>checkpointall</string>
-#         <string>--silent</string>
-#     </array>
-#     <key>StartCalendarInterval</key>
-#     <array>
-#         <dict>
-#             <key>Minute</key>
-#             <integer>0</integer>
-#         </dict>
-#         <dict>
-#             <key>Minute</key>
-#             <integer>10</integer>
-#         </dict>
-#         <dict>
-#             <key>Minute</key>
-#             <integer>20</integer>
-#         </dict>
-#         <dict>
-#             <key>Minute</key>
-#             <integer>30</integer>
-#         </dict>
-#         <dict>
-#             <key>Minute</key>
-#             <integer>40</integer>
-#         </dict>
-#         <dict>
-#             <key>Minute</key>
-#             <integer>50</integer>
-#         </dict>
-#     </array>
-#     <key>RunAtLoad</key>
-#     <true/>
-#     <key>ProcessType</key>
-#     <string>Interactive</string>
-#     <key>CFBundleIdentifier</key>
-#     <string>com.unflab.autosave</string>
-#     <key>EnvironmentVariables</key>
-#     <dict>
-#         <key>PATH</key>
-#         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-#         <key>HOME</key>
-#         <string>$HOME</string>
-#     </dict>
-#     <key>WorkingDirectory</key>
-#     <string>$HOME</string>
-#     <key>KeepAlive</key>
-#     <false/>
-#     <key>ThrottleInterval</key>
-#     <integer>60</integer>
-# </dict>
-# </plist>
-# EOF
+</plist>'
 
-    # Load the LaunchAgent
-    launchctl unload "$PLIST_FILE" 2>/dev/null
-    launchctl load "$PLIST_FILE" 2>/dev/null
+    # Track if we made any changes
+    local made_changes=false
+
+    # Check if the LaunchAgent exists and compare contents
+    if [ -f "$PLIST_FILE" ]; then
+        log_message "Autocheckpoint plist file found."
+        CURRENT_CONTENT=$(cat "$PLIST_FILE")
+        if [ "$CURRENT_CONTENT" != "$PLIST_CONTENT" ]; then
+            log_message "Updating plist file."
+            echo "$PLIST_CONTENT" > "$PLIST_FILE"
+            log_message "Reloading service."
+            launchctl unload "$PLIST_FILE" 2>/dev/null
+            launchctl load "$PLIST_FILE" 2>/dev/null
+            made_changes=true
+        else
+            log_message "Autocheckpoint service is up to date."
+        fi
+    else
+        log_message "Autocheckpoint plist file not found, creating new file."
+        echo "$PLIST_CONTENT" > "$PLIST_FILE"
+        made_changes=true
+    fi
+
+    # Check if the service is loaded
+    log_message "Checking if autocheckpoint service is loaded."
+    if ! launchctl list | grep -q "com.unflab.autosave"; then
+        log_message "Service not loaded, loading now"
+        launchctl load "$PLIST_FILE" 2>/dev/null
+        made_changes=true
+    fi
     
     if [ $? -eq 0 ]; then
-        display_notification "Autosave Enabled" "UNFlab will autosave your work every 15 minutes."
+        log_message "Autosave service enabled successfully"
+        if [ "$made_changes" = true ]; then
+            display_notification "Autosave Enabled" "UNFlab will autosave your work every 15 minutes."
+        fi
     else
+        log_message "Failed to enable autosave service"
         display_notification "Autosave is Disabled." "Failed to enable autosave. Please check permissions."
         return 1
     fi
+    
+    log_message "(END ENABLE_AUTO_CHECKPOINT)"
 }
 
 disable_auto_checkpoint() {
