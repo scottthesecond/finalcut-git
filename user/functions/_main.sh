@@ -109,7 +109,7 @@ if [ -n "$script" ]; then
     "checkpointall") 
       checkpoint_all || handle_error "Checkpoint all operation failed"
       ;;
-    "setup")
+    "setup"|"Setup")
       setup "$parameter" || handle_error "Setup operation failed"
       ;;
     "open")

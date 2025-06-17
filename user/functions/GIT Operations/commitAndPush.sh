@@ -29,7 +29,7 @@ commitAndPush() {
 
     # Check for unstaged changes
     log_message "Checking for unstaged changes in $selected_repo"
-    if git diff-index --quiet HEAD --; then
+    if git diff-index --quiet HEAD -- && [ -z "$(git status --porcelain)" ]; then
         log_message "No changes to commit in $selected_repo."
         return 0
     fi
