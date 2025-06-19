@@ -66,7 +66,7 @@ show_progress() {
 show_details() {
     local message="$1"
     if [ "$progressbar" = true ]; then
-        echo "DETAILS:$message"
+        echo "$message"
     fi
 }
 
