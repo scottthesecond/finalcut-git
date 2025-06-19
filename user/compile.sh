@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="2.2"
+VERSION="2.2.1"
 NAME="UNFlab"
 
 # Make build directory if it does not exist
