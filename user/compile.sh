@@ -7,6 +7,49 @@ FUNCTIONS="$SCRIPT_DIR/functions"
 VERSION="3.0.0a"
 NAME="UNFlab"
 
+# Default values
+BUILD_WITH_PLATYPUS=false
+SHOW_HELP=false
+SKIP_BUILD=false
+
+# Parse command line arguments
+while [[ "$1" != "" ]]; do
+    case $1 in
+        --build|-b)
+            BUILD_WITH_PLATYPUS=true
+            ;;
+        --no-build)
+            SKIP_BUILD=true
+            ;;
+        --help|-h)
+            SHOW_HELP=true
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Show help if requested
+if [ "$SHOW_HELP" = true ]; then
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --build, -b    Automatically build with Platypus without prompting"
+    echo "  --no-build     Skip Platypus build entirely without prompting"
+    echo "  --help, -h     Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0              # Build scripts and prompt for Platypus build"
+    echo "  $0 --build      # Build scripts and automatically build with Platypus"
+    echo "  $0 --no-build   # Build scripts only, skip Platypus build"
+    echo "  $0 -b           # Same as --build"
+    exit 0
+fi
+
 # Make build directory if it does not exist
 mkdir -p "$SCRIPT_DIR/build"
 
@@ -69,11 +112,27 @@ chmod +x "$output_file"
 #chmod +x "$autosave_copy"
 echo "All scripts concatenated into $output_file."
 
-# Ask the user if they want to continue
-read -p "Build app with Platypus?" choice
+# Check if we should build with Platypus
+if [ "$SKIP_BUILD" = true ]; then
+    echo "Skipping Platypus build as requested."
+    build_with_platypus=false
+elif [ "$BUILD_WITH_PLATYPUS" = true ]; then
+    echo "Building with Platypus..."
+    build_with_platypus=true
+else
+    # Ask the user if they want to continue
+    read -p "Build app with Platypus?" choice
+    
+    # Check the user's input
+    if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+        build_with_platypus=true
+    else
+        build_with_platypus=false
+    fi
+fi
 
-# Check the user's input
-if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+# Build with Platypus if requested
+if [ "$build_with_platypus" = true ]; then
     echo "building..."
 
     OUT_ZIP="$SCRIPT_DIR/build/$NAME $VERSION.zip"
@@ -94,7 +153,26 @@ if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
         rm -rf "$APPLICATIONS_DIR/$OUT_APP"
     fi
 
-    # Build the app with Platypus
+    # Build the progress bar app with Platypus (using same script)
+    echo "Building progress bar app..."
+    progress_app_name="$NAME Progress"
+    progress_out_app="$progress_app_name.app"
+    
+    /usr/local/bin/platypus \
+        --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
+        --background \
+        --name "$progress_app_name"\
+        --app-version "$VERSION"\
+        --author "Unnamed Media"\
+        --interface-type 'Progress Bar'\
+        --interpreter '/bin/bash'\
+        --script-args '-progressbar'\
+        --bundled-file "$output_file"\
+        "$SCRIPT_DIR/build/fcp-git-user.sh"\
+        "$SCRIPT_DIR/build/$progress_out_app"
+    
+    # Build the status menu app with Platypus (including progress app as bundled file)
+    echo "Building status menu app with bundled progress app..."
     /usr/local/bin/platypus \
         --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
         --background \
@@ -111,6 +189,7 @@ if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
         --status-item-template-icon\
         --uniform-type-identifiers 'public.item|public.folder'\
         --bundled-file "$output_file"\
+        --bundled-file "$SCRIPT_DIR/build/$progress_out_app"\
         "$SCRIPT_DIR/build/fcp-git-user.sh"\
         "$SCRIPT_DIR/build/$OUT_APP"
   

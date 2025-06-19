@@ -30,7 +30,7 @@ hide_dialog() {
 }
 
 
-# Function to display a macOS notification using Platypus format
+# Function to display a macOS notification
 display_notification() {
   local TITLE="$1"
   local MESSAGE="$2"
@@ -41,10 +41,43 @@ display_notification() {
     return
   fi
 
-  # Use Platypus NOTIFICATION format
-  if [ -n "$SUBTITLE" ]; then
-    echo "NOTIFICATION:$TITLE|$MESSAGE - $SUBTITLE"
-  else
-    echo "NOTIFICATION:$TITLE|$MESSAGE"
-  fi
+  osascript <<EOF
+display notification "$MESSAGE" with title "$TITLE" subtitle "$SUBTITLE"
+EOF
+}
+
+# Function to cleanly exit the application using Platypus format
+clean_exit() {
+    local exit_code="${1:-0}"
+    
+    # Use Platypus QUITAPP for clean termination
+    echo "QUITAPP"
+    exit "$exit_code"
+}
+
+# Progress bar output functions
+show_progress() {
+    local percentage="$1"
+    if [ "$progressbar" = true ]; then
+        echo "PROGRESS:$percentage"
+    fi
+}
+
+show_details() {
+    local message="$1"
+    if [ "$progressbar" = true ]; then
+        echo "DETAILS:$message"
+    fi
+}
+
+show_details_on() {
+    if [ "$progressbar" = true ]; then
+        echo "DETAILS:SHOW"
+    fi
+}
+
+show_details_off() {
+    if [ "$progressbar" = true ]; then
+        echo "DETAILS:HIDE"
+    fi
 }

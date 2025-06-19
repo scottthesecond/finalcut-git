@@ -1,6 +1,12 @@
 # Function to log messages
 log_message() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+    local message="$(date '+%Y-%m-%d %H:%M:%S') - $1"
+    echo "$message" >> "$LOG_FILE"
+    
+    # Echo to console if debug mode is enabled
+    if [ "$DEBUG_MODE" = true ]; then
+        echo "$message"
+    fi
 }
 
 # Function to handle errors using Platypus ALERT format

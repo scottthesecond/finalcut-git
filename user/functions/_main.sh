@@ -1,9 +1,11 @@
 #log_message "-----   $APP_NAME ($VERSION) MAIN LOOP STARTED   -----"
 
 navbar=false
+progressbar=false
 script=""
 parameter=""
 SILENT_MODE=false
+DEBUG_MODE=false
 
 enable_auto_checkpoint
 
@@ -28,13 +30,32 @@ parse_url() {
 
 # Parse arguments
 while [[ "$1" != "" ]]; do
+  log_message "Processing argument: '$1'"
   case $1 in
     # Mode flags
     -navbar)
       navbar=true
       ;;
+    -progressbar)
+      progressbar=true
+      ;;
     --silent)
       SILENT_MODE=true
+      ;;
+    --debug)
+      DEBUG_MODE=true
+      ;;
+      
+    # Progress bar operations (when launched from status menu)
+    checkout|checkin|checkpoint)
+      if [ "$progressbar" = true ]; then
+        script="$1"
+        shift
+        if [ -n "$1" ]; then
+          parameter="$1"
+        fi
+        break
+      fi
       ;;
       
     # URL-based commands
@@ -65,19 +86,7 @@ while [[ "$1" != "" ]]; do
     "Check Out Another Project")
       script="checkout"
       ;;
-      
-    # Direct project names (from checkout submenu)
-    \"*\")
-      # Check if this is a project name for checkout
-      if repo_exists "$(echo "$1" | tr -d '"')" "$CHECKEDIN_FOLDER"; then
-        script="checkout"
-        parameter=$(echo "$1" | tr -d '"')
-      else
-        script="open"
-        parameter=$(echo "$1" | tr -d '"')
-      fi
-      ;;
-      
+            
     # Navigation operations (legacy format)
     " ↳ Go To "*)
       script="open"
@@ -96,20 +105,18 @@ while [[ "$1" != "" ]]; do
       parameter="NEW"
       ;;
       
-    # Default case for direct script/parameter pairs
+    # Default case for direct script/parameter pairs and quoted project names
     *)
       if [ -z "$script" ]; then
         script=$1
       elif [ -z "$parameter" ]; then
-        parameter=$1
+        # If parameter is quoted, strip quotes
+        parameter=$(echo "$1" | sed 's/^"//;s/"$//')
       fi
       ;;
   esac
   shift
 done
-
-# Clean up parameter by removing surrounding quotes
-parameter=$(echo "$parameter" | tr -d '"')
 
 # Log the final script and parameter values
 log_message "Script: $script"
@@ -117,6 +124,7 @@ log_message "Parameter: $parameter"
 
 # Export SILENT_MODE for child scripts
 export SILENT_MODE
+export DEBUG_MODE
 
 # Execute the requested script if one was specified
 if [ -n "$script" ]; then
@@ -125,14 +133,25 @@ if [ -n "$script" ]; then
       checkin "$parameter" || handle_error "Check-in operation failed"
       ;;
     "checkout")
+
+      log_message "preparing for checkout script"
+
       if [ "$parameter" = "NEW" ]; then
         # Prompt for new repo name using AppleScript
         new_repo_name=$(osascript -e 'display dialog "Enter the name of the new repository:" default answer ""' -e 'text returned of result')
         if [ -n "$new_repo_name" ]; then
-          checkout "$new_repo_name" || handle_error "Check-out operation failed"
+          if [ "$progressbar" = true ]; then
+            checkout "$new_repo_name" || handle_error "Check-out operation failed"
+          else
+            launch_progress_app "checkout" "$new_repo_name" ""
+          fi
         fi
       else
-        checkout "$parameter" || handle_error "Check-out operation failed"
+        if [ "$progressbar" = true ]; then
+          checkout "$parameter" || handle_error "Check-out operation failed"
+        else
+          launch_progress_app "checkout" "$parameter" ""
+        fi
       fi
       ;;
     "checkpoint")
@@ -157,6 +176,28 @@ if [ -n "$script" ]; then
       ;;
   esac
 fi
+
+# Function to launch progress bar app for long operations
+launch_progress_app() {
+    local operation="$1"
+    local repo_name="$2"
+    local commit_message="$3"
+    
+    # Get the path to the bundled progress bar app
+    # SCRIPT_DIR points to the Resources folder in the bundled app
+    local progress_app_path="${SCRIPT_DIR}/UNFlab Progress.app"
+    
+    log_message "Progress app path: $progress_app_path"
+    
+
+    # Launch the progress bar app with the operation
+    if [ -d "$progress_app_path" ]; then
+        open "$progress_app_path" --args "$operation" "$repo_name" "$commit_message"
+    else
+        # Fallback: try to find it in Applications
+        open -a "UNFlab Progress" --args "$operation" "$repo_name" "$commit_message"
+    fi
+}
 
 # Function to get recently checked out projects
 get_recent_projects() {
@@ -201,7 +242,7 @@ display_navbar_menu() {
             if [ -n "$submenu_items" ]; then
                 submenu_items="$submenu_items|"
             fi
-            submenu_items="$submenu_items\"$project\""
+            submenu_items="$submenu_items|checkout \"$project\""
         done
         # Add divider and New Project option
         submenu_items="$submenu_items|----|New Project..."

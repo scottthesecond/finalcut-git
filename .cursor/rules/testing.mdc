@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Test your code fixes by comiling the scripts (/user/compile.sh --no-build; the --no-build flag only compiles the script and doesn't build the Platypus app.  You can then run the script in /user/build/fcp-git-user.sh.  Add the --debug flag to write all logs to the console instead of the log file).  You can add the -navbar or -progress flags to simulate the different platypus apps.

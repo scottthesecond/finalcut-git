@@ -125,6 +125,11 @@ checkout() {
     log_message "(BEGIN CHECKOUT)"
     log_message "(CHECKOUT parameters: $1)"
 
+    # Show initial progress
+    show_progress 10
+    show_details_on
+    show_details "Starting checkout process..."
+
     # Create operation lock
     if ! create_operation_lock "checkout"; then
         exit $RC_ERROR
@@ -134,12 +139,15 @@ checkout() {
     if [ -n "$1" ]; then
         selected_repo="$1"
         log_message "Repository passed from command: $selected_repo"
+        show_details "Repository: $selected_repo"
     else
         log_message "Repository not passed from command. Prompting user to select..."
+        show_details "Selecting repository..."
         select_repo "Check out a recent repository, or a new one?" --allowNew --checkedIn
     fi
 
-    display_dialog_timed "Syncing Project" "Syncing $selected_repo from the server...." "Hide"
+    show_progress 20
+    show_details "Checking repository status..."
 
     # Check initial repository status
     check_repo_status "$selected_repo"
@@ -147,20 +155,36 @@ checkout() {
     
     case $status in
         1)  # Already checked out
+            show_progress 100
+            show_details "Repository already checked out, opening..."
             open_fcp_or_directory
             return $RC_SUCCESS
             ;;
         2)  # Needs cloning
-            git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" >> "$LOG_FILE" 2>&1 || cancel_checkout "Git clone failed for $selected_repo"
+            show_progress 30
+            show_details "Repository not found locally, cloning from server..."
+            git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" 2>&1 | while read line; do
+                show_details "$line"
+            done
+            if [ $? -ne 0 ]; then
+                cancel_checkout "Git clone failed for $selected_repo"
+            fi
             log_message "Repository cloned: $selected_repo"
+            show_details "Repository cloned successfully"
             ;;
     esac
+
+    show_progress 50
+    show_details "Preparing repository for checkout..."
 
     # Prepare repository for checkout
     repo_path="$CHECKEDIN_FOLDER/$selected_repo"
     if ! prepare_repo_for_checkout "$repo_path"; then
         cancel_checkout "Failed to prepare repository for checkout"
     fi
+
+    show_progress 70
+    show_details "Getting commit message..."
 
     # Get the commit message
     log_message "Getting commit message."
@@ -174,6 +198,9 @@ checkout() {
         cancel_checkout "Failed to get commit message"
     fi
 
+    show_progress 80
+    show_details "Setting checkout status and committing..."
+
     # Set checked out status and commit
     set_checkedout_status "$CURRENT_USER" "$commit_message" "$repo_path"
     commitAndPush "Checked out by $CURRENT_USER: $commit_message"
@@ -181,9 +208,15 @@ checkout() {
         cancel_checkout "Failed to commit and push checkout status"
     fi
 
+    show_progress 90
+    show_details "Moving repository to checked out folder..."
+
     # Move to checkedout folder
     log_message "Moving repo to checkedout folder..."
     move_to_checkedout || cancel_checkout "Couldn't move $selected_repo to the checked out folder"
+
+    show_progress 100
+    show_details "Checkout complete! Opening project..."
 
     hide_dialog
     create_settings_plist

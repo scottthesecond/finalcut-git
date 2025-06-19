@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+When compiled, the script is built into two platypus apps – one that displays a progress bar style interface, and another that runs in the status bar.  The progress bar style one is bundled with the status bar one.
