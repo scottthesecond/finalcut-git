@@ -30,7 +30,7 @@ hide_dialog() {
 }
 
 
-# Function to display a macOS notification
+# Function to display a macOS notification using Platypus format
 display_notification() {
   local TITLE="$1"
   local MESSAGE="$2"
@@ -41,7 +41,10 @@ display_notification() {
     return
   fi
 
-  osascript <<EOF
-display notification "$MESSAGE" with title "$TITLE" subtitle "$SUBTITLE"
-EOF
+  # Use Platypus NOTIFICATION format
+  if [ -n "$SUBTITLE" ]; then
+    echo "NOTIFICATION:$TITLE|$MESSAGE - $SUBTITLE"
+  else
+    echo "NOTIFICATION:$TITLE|$MESSAGE"
+  fi
 }

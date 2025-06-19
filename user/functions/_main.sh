@@ -49,10 +49,16 @@ while [[ "$1" != "" ]]; do
       script="checkpointall"
       ;;
       
-    # Check in operations
-    " ↳ Check In "*)
+    # Check in operations (from submenus)
+    "Check In "*)
       script="checkin"
-      parameter=$(echo "$1" | sed 's/ ↳ Check In //')
+      parameter=$(echo "$1" | sed 's/Check In //' | tr -d '"')
+      ;;
+      
+    # Quick Save operations (from submenus)
+    "Quick Save "*)
+      script="checkpoint"
+      parameter=$(echo "$1" | sed 's/Quick Save //' | tr -d '"')
       ;;
       
     # Checkout operations
@@ -60,16 +66,34 @@ while [[ "$1" != "" ]]; do
       script="checkout"
       ;;
       
-    # Navigation operations
+    # Direct project names (from checkout submenu)
+    \"*\")
+      # Check if this is a project name for checkout
+      if repo_exists "$(echo "$1" | tr -d '"')" "$CHECKEDIN_FOLDER"; then
+        script="checkout"
+        parameter=$(echo "$1" | tr -d '"')
+      else
+        script="open"
+        parameter=$(echo "$1" | tr -d '"')
+      fi
+      ;;
+      
+    # Navigation operations (legacy format)
     " ↳ Go To "*)
       script="open"
       parameter=$(echo "$1" | sed 's/ ↳ Go To //')
       ;;
       
-    # Quoted project names
-    \"*\")
-      script="open"
-      parameter=$(echo "$1" | tr -d '"')
+    # Check in operations (legacy format)
+    " ↳ Check In "*)
+      script="checkin"
+      parameter=$(echo "$1" | sed 's/ ↳ Check In //')
+      ;;
+      
+    # New Project creation from submenu
+    "New Project...")
+      script="checkout"
+      parameter="NEW"
       ;;
       
     # Default case for direct script/parameter pairs
@@ -101,7 +125,15 @@ if [ -n "$script" ]; then
       checkin "$parameter" || handle_error "Check-in operation failed"
       ;;
     "checkout")
-      checkout "$parameter" || handle_error "Check-out operation failed"
+      if [ "$parameter" = "NEW" ]; then
+        # Prompt for new repo name using AppleScript
+        new_repo_name=$(osascript -e 'display dialog "Enter the name of the new repository:" default answer ""' -e 'text returned of result')
+        if [ -n "$new_repo_name" ]; then
+          checkout "$new_repo_name" || handle_error "Check-out operation failed"
+        fi
+      else
+        checkout "$parameter" || handle_error "Check-out operation failed"
+      fi
       ;;
     "checkpoint")
       checkpoint "$parameter" || handle_error "Checkpoint operation failed"
@@ -114,7 +146,7 @@ if [ -n "$script" ]; then
       ;;
     "open")
       log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
-      if [ ! -d "$CHECKEDOUT_FOLDER/$parameter" ]; then
+      if ! repo_exists "$parameter" "$CHECKEDOUT_FOLDER"; then
         handle_error "Project directory not found: $parameter"
       else
         open "$CHECKEDOUT_FOLDER/$parameter" || handle_error "Failed to open project: $parameter"
@@ -126,48 +158,67 @@ if [ -n "$script" ]; then
   esac
 fi
 
+# Function to get recently checked out projects
+get_recent_projects() {
+    get_checkedin_repos
+}
+
 # Function to display the navbar menu
 display_navbar_menu() {
     # Get checked out projects
-    if [ -d "$CHECKEDOUT_FOLDER" ]; then
-        folders=("$CHECKEDOUT_FOLDER"/*)
-
-        # Check if there are any repositories
-        if [ ${#folders[@]} -eq 1 ] && [ ! -e "${folders[0]}" ]; then
-            echo "(You do not currently have any projects checked out)"
-        else
-            for folder in "${folders[@]}"; do
-                folder_name=$(basename "$folder")
-                CHECKEDOUT_FILE="$folder/.CHECKEDOUT"
-                
-                # Output project name
-                echo "\"$folder_name\""
-
-                # Display last checkpoint time if available
-                if [ -f "$CHECKEDOUT_FILE" ]; then
-                    last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
-                    echo " ↳ Last Autosave: $last_checkpoint"
-                fi
-
-                echo " ↳ Check In \"$folder_name\""
-            done
-        fi
+    local checkedout_repos=($(get_checkedout_repos))
+    
+    if [ ${#checkedout_repos[@]} -eq 0 ]; then
+        echo "DISABLED|(You do not currently have any projects checked out)"
     else
-        echo "(You do not currently have any projects checked out)"
+        for repo_name in "${checkedout_repos[@]}"; do
+            local repo_path="$CHECKEDOUT_FOLDER/$repo_name"
+            local CHECKEDOUT_FILE="$repo_path/.CHECKEDOUT"
+            
+            # Get last checkpoint time if available
+            local last_checkpoint=""
+            if [ -f "$CHECKEDOUT_FILE" ]; then
+                last_checkpoint=$(grep 'LAST_COMMIT=' "$CHECKEDOUT_FILE" | cut -d '=' -f 2)
+            fi
+            
+            # Create submenu for this project
+            if [ -n "$last_checkpoint" ]; then
+                echo "SUBMENU|$repo_name|DISABLED|Last Autosave: $last_checkpoint|Check In \"$repo_name\"|Quick Save \"$repo_name\""
+            else
+                echo "SUBMENU|$repo_name|Check In \"$repo_name\"|Quick Save \"$repo_name\""
+            fi
+        done
     fi
 
+    # Display menu separator
+    echo "----"
+    
+    # Create submenu for checkout with recent projects
+    local recent_projects=($(get_recent_projects))
+    if [ ${#recent_projects[@]} -gt 0 ]; then
+        local submenu_items=""
+        for project in "${recent_projects[@]}"; do
+            if [ -n "$submenu_items" ]; then
+                submenu_items="$submenu_items|"
+            fi
+            submenu_items="$submenu_items\"$project\""
+        done
+        # Add divider and New Project option
+        submenu_items="$submenu_items|----|New Project..."
+        echo "SUBMENU|Check Out Another Project|$submenu_items"
+    else
+        echo "SUBMENU|Check Out Another Project|New Project..."
+    fi
+    
     # Display menu footer
     echo "----"
-    echo "Check Out Another Project"
-    echo "----"
-    echo "$APP_NAME Version $VERSION"
-    echo "Quick Save"
+    echo "DISABLED|$APP_NAME Version $VERSION"
     echo "Setup"
     echo "----"
 }
 
 # Handle navbar mode display
-if $NAVBAR_MODE; then
+if $navbar; then
     display_navbar_menu
     exit 0
 fi

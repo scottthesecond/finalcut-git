@@ -3,7 +3,7 @@ log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
 
-# Function to handle errors
+# Function to handle errors using Platypus ALERT format
 handle_error() {
     echo "$1"
     log_message "ERROR: $1"
@@ -13,7 +13,12 @@ handle_error() {
         exit 1
     fi
 
-    osascript -e "display dialog \"Error: $1. See log for details.\" buttons {\"Copy Log to Desktop\", \"OK\"} default button \"OK\"" -e "if button returned of result is \"Copy Log to Desktop\" then do shell script \"cp '$LOG_FILE' ~/Desktop/\""
+    # Use Platypus ALERT format
+    echo "ALERT:Error|$1. See log for details."
+    
+    # Copy log to desktop for easy access
+    cp "$LOG_FILE" ~/Desktop/ 2>/dev/null || true
+    
     exit 1
 }
 

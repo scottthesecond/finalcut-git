@@ -3,9 +3,8 @@ select_repo() {
 
     log_message " //// BEGIN SELECT_REPO \\\\"
 
-
     local enable_new="false"
-    local folders=("$CHECKEDOUT_FOLDER"/*)
+    local repos=($(get_checkedout_repos))
     local prompt_text="Select an existing repository:" # Default prompt
 
     # Check for passed arguments
@@ -13,23 +12,22 @@ select_repo() {
         if [ "$arg" == "--allowNew" ]; then
             enable_new="true"
         elif [ "$arg" == "--checkedIn" ]; then
-            folders=("$CHECKEDIN_FOLDER"/*)
+            repos=($(get_checkedin_repos))
         else
             prompt_text="$arg"  # Set the argument as the custom prompt
         fi
     done
    
     # Check if there are any repositories
-    if [ ${#folders[@]} -eq 0 ]; then
-        osascript -e 'display dialog "No repositories found in the repos folder." buttons {"OK"} default button "OK"'
+    if [ ${#repos[@]} -eq 0 ]; then
+        echo "ALERT:No Repositories|No repositories found in the repos folder."
         exit 1
     fi
 
     # Create an AppleScript list with repo names
     repo_list=""
-    for i in "${!folders[@]}"; do
-        folder_name=$(basename "${folders[$i]}")
-        repo_list="$repo_list\"$folder_name\", "
+    for repo_name in "${repos[@]}"; do
+        repo_list="$repo_list\"$repo_name\", "
     done
 
     # If "New" option is enabled, add it to the list

@@ -53,51 +53,46 @@ checkpoint_all() {
     fi
     
     # Get all checked out repositories
-    folders=("$CHECKEDOUT_FOLDER"/*)
-    log_message "Found ${#folders[@]} checked out folders."
+    local checkedout_repos=($(get_checkedout_repos))
+    log_message "Found ${#checkedout_repos[@]} checked out folders."
     
     # Check if there are any repositories
-    if [ ${#folders[@]} -eq 0 ]; then
+    if [ ${#checkedout_repos[@]} -eq 0 ]; then
         log_message "No repositories are currently checked out."
         return $RC_SUCCESS
     fi
     
-    for folder in "${folders[@]}"; do
-        if [ -d "$folder" ]; then
-            selected_repo=$(basename "$folder")
-            log_message "Processing repo: $selected_repo"
-            
-            # Change to the repository directory
-            if ! cd "$CHECKEDOUT_FOLDER/$selected_repo"; then
-                log_message "Error: Failed to change to repository directory: $CHECKEDOUT_FOLDER/$selected_repo"
+    for repo_name in "${checkedout_repos[@]}"; do
+        log_message "Processing repo: $repo_name"
+        
+        # Change to the repository directory
+        if ! cd "$CHECKEDOUT_FOLDER/$repo_name"; then
+            log_message "Error: Failed to change to repository directory: $CHECKEDOUT_FOLDER/$repo_name"
+            continue
+        fi
+
+        # Check if any files are open and check recent access
+        check_open_files
+        open_files_result=$?
+        check_recent_access
+        recent_access_result=$?
+
+        if [ $open_files_result -eq 1 ] && [ $recent_access_result -eq 0 ]; then
+            log_message "No files open and no recent file access in $repo_name, performing automatic checkin instead of checkpoint."
+            # Perform full checkin instead of checkpoint
+            if ! checkin "$repo_name"; then
+                log_message "Error: Failed to checkin $repo_name"
                 continue
             fi
+            # Skip to next repository since this one is now checked in
+            continue
+        fi
 
-            # Check if any files are open and check recent access
-            check_open_files
-            open_files_result=$?
-            check_recent_access
-            recent_access_result=$?
-
-            if [ $open_files_result -eq 1 ] && [ $recent_access_result -eq 0 ]; then
-                log_message "No files open and no recent file access in $selected_repo, performing automatic checkin instead of checkpoint."
-                # Perform full checkin instead of checkpoint
-                if ! checkin "$selected_repo"; then
-                    log_message "Error: Failed to checkin $selected_repo"
-                    continue
-                fi
-                # Skip to next repository since this one is now checked in
-                continue
-            fi
-
-            # If we get here, we're doing a normal checkpoint
-            log_message "Creating checkpoint for: $selected_repo"
-            if ! checkpoint "$selected_repo"; then
-                log_message "Error: Failed to checkpoint $selected_repo"
-                continue
-            fi
-        else
-            log_message "Skipping $folder (not a directory)"
+        # If we get here, we're doing a normal checkpoint
+        log_message "Creating checkpoint for: $repo_name"
+        if ! checkpoint "$repo_name"; then
+            log_message "Error: Failed to checkpoint $repo_name"
+            continue
         fi
     done
 

@@ -29,16 +29,15 @@ cancel_checkout() {
 #   2: Needs cloning
 check_repo_status() {
     local repo_name="$1"
-    local repo_path="$CHECKEDOUT_FOLDER/$repo_name"
     
     # Check if already checked out
-    if [ -d "$repo_path" ]; then
+    if repo_exists "$repo_name" "$CHECKEDOUT_FOLDER"; then
         log_message "Selected repo already checked out: $repo_name"
         return 1  # Already checked out
     fi
     
     # Check if available in CHECKEDIN_FOLDER
-    if [ ! -d "$CHECKEDIN_FOLDER/$repo_name" ]; then
+    if ! repo_exists "$repo_name" "$CHECKEDIN_FOLDER"; then
         log_message "Repository $repo_name does not exist locally. Cloning..."
         return 2  # Needs cloning
     fi
@@ -108,7 +107,7 @@ prepare_repo_for_checkout() {
                 log_message "Repository is already checked out by $checked_out_by"
                 log_message "Checkout reason: $commit_message"
                 hide_dialog
-                osascript -e "display dialog \"Repository is already checked out by $checked_out_by.\nReason: $commit_message\" buttons {\"OK\"} default button \"OK\""
+                echo "ALERT:Repository Already Checked Out|Repository is already checked out by $checked_out_by. Reason: $commit_message"
                 return $RC_ERROR
             fi
         fi

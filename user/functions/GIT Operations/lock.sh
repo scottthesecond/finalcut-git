@@ -32,7 +32,7 @@ create_operation_lock() {
             rm -f "$lock_file"
         elif ps -p "$lock_pid" > /dev/null 2>&1; then
             log_message "Another $operation operation is in progress (PID: $lock_pid)"
-            osascript -e "display dialog \"Another $operation operation is currently in progress. Please wait for it to complete.\" buttons {\"OK\"} default button \"OK\""
+            echo "ALERT:Operation in Progress|Another $operation operation is currently in progress. Please wait for it to complete."
             return $RC_ERROR
         else
             # Process is not running, remove stale lock

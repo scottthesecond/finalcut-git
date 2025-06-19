@@ -33,7 +33,7 @@ handle_repo_operation() {
     # Check connectivity before proceeding
     if ! check_connectivity; then
         log_message "No connectivity to origin for $repo_name"
-        osascript -e "display dialog \"Unable to connect to the server. Please check your internet connection and try again.\" buttons {\"OK\"} default button \"OK\""
+        echo "ALERT:Connection Error|Unable to connect to the server. Please check your internet connection and try again."
         return $RC_ERROR
     fi
     
