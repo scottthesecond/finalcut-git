@@ -81,7 +81,11 @@ commitAndPush() {
     fi
 
     log_message "Pushing changes for $selected_repo"
-    show_details "Pushing changes to server..."
+    if [[ "$commit_message" == *"Checked out by"* ]]; then
+        show_details "Locking project..."
+    else
+        show_details "Pushing changes to server..."
+    fi
     push_output=$(git push 2>&1)
     push_status=$?
     

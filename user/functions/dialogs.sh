@@ -63,6 +63,12 @@ show_progress() {
     fi
 }
 
+show_indeterminate_progress() {
+    if [ "$progressbar" = true ]; then
+        echo "PROGRESS:INDETERMINATE"
+    fi
+}
+
 show_details() {
     local message="$1"
     if [ "$progressbar" = true ]; then

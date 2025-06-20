@@ -110,13 +110,42 @@ prepare_repo_for_checkout() {
     # Pull latest changes
     log_message "Pulling latest changes..."
     show_details "Pulling latest changes from server..."
-    pull_output=$(git pull 2>&1)
-    pull_status=$?
-    if [ $pull_status -ne 0 ]; then
-        log_message "Error: Failed to pull latest changes"
-        log_message "Pull output: $pull_output"
-        show_details "Failed to pull latest changes: $pull_output"
-        show_git_output "$pull_output" "pull"
+    show_details "This may take a moment depending on your connection..."
+    show_indeterminate_progress
+    
+    # Use git fetch first to get updates, then merge
+    show_details "Fetching latest changes..."
+    fetch_output=$(git fetch origin 2>&1)
+    fetch_status=$?
+    if [ $fetch_status -ne 0 ]; then
+        log_message "Error: Failed to fetch latest changes"
+        log_message "Fetch output: $fetch_output"
+        show_details "Failed to fetch latest changes: $fetch_output"
+        show_git_output "$fetch_output" "fetch"
+        handle_git_conflict "$repo_path"
+        conflict_status=$?
+        if [ $conflict_status -eq 0 ]; then
+            # Conflict was successfully resolved, the checkout should continue
+            log_message "Conflict resolved successfully, continuing with checkout"
+            return $RC_SUCCESS
+        else
+            # Conflict resolution failed
+            return $RC_ERROR
+        fi
+    else
+        show_details "Fetch completed successfully"
+        show_git_output "$fetch_output" "fetch"
+    fi
+    
+    # Now merge the changes
+    show_details "Merging changes..."
+    merge_output=$(git merge origin/master 2>&1)
+    merge_status=$?
+    if [ $merge_status -ne 0 ]; then
+        log_message "Error: Failed to merge latest changes"
+        log_message "Merge output: $merge_output"
+        show_details "Failed to merge latest changes: $merge_output"
+        show_git_output "$merge_output" "merge"
         handle_git_conflict "$repo_path"
         conflict_status=$?
         if [ $conflict_status -eq 0 ]; then
@@ -129,12 +158,13 @@ prepare_repo_for_checkout() {
         fi
     else
         show_details "Latest changes pulled successfully"
-        show_git_output "$pull_output" "pull"
+        show_git_output "$merge_output" "merge"
     fi
     
     # Verify repository is still available after pull
     log_message "Verifying repository status..."
     show_details "Verifying repository status..."
+    show_progress 60
     if [ -f "CHECKEDOUT" ] || [ -f ".CHECKEDOUT" ]; then
         local status=$(get_checkedout_status "$repo_path")
         if [ -n "$status" ]; then
@@ -165,11 +195,12 @@ checkout() {
 
     # Show initial progress
     show_progress 10
-    show_details_on
+    show_details_off
     show_details "Starting checkout process..."
 
     # Create operation lock
     if ! create_operation_lock "checkout"; then
+        show_details_on
         exit $RC_ERROR
     fi
 
@@ -204,6 +235,7 @@ checkout() {
             clone_output=$(git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" 2>&1)
             clone_status=$?
             if [ $clone_status -ne 0 ]; then
+                show_details_on
                 show_details "Git clone failed: $clone_output"
                 show_git_output "$clone_output" "clone"
                 cancel_checkout "Git clone failed for $selected_repo"
@@ -220,11 +252,12 @@ checkout() {
     # Prepare repository for checkout
     repo_path="$CHECKEDIN_FOLDER/$selected_repo"
     if ! prepare_repo_for_checkout "$repo_path"; then
+        show_details_on
         cancel_checkout "Failed to prepare repository for checkout"
     fi
 
     show_progress 70
-    show_details "Getting commit message..."
+    show_details "Waiting for commit message..."
 
     # Get the commit message
     log_message "Getting commit message."
@@ -233,18 +266,21 @@ checkout() {
     log_message "$commit_status"
     
     if [ $commit_status -eq $RC_CANCEL ]; then
+        show_details_on
         cancel_checkout "User canceled checkout"
     elif [ $commit_status -ne $RC_SUCCESS ]; then
+        show_details_on
         cancel_checkout "Failed to get commit message"
     fi
 
     show_progress 80
-    show_details "Setting checkout status and committing..."
+    show_details "Setting checkout status and locking project..."
 
     # Set checked out status and commit
     set_checkedout_status "$CURRENT_USER" "$commit_message" "$repo_path"
     commitAndPush "Checked out by $CURRENT_USER: $commit_message"
     if [ $? -ne 0 ]; then
+        show_details_on
         cancel_checkout "Failed to commit and push checkout status"
     fi
 
