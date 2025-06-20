@@ -174,7 +174,17 @@ export DEBUG_MODE
 if [ -n "$script" ]; then
   case $script in
     "checkin")
-      checkin "$parameter" || handle_error "Check-in operation failed"
+      log_message "preparing for checkin script"
+      log_message "Parameter value: '$parameter'"
+      log_message "Progressbar mode: $progressbar"
+
+      if [ "$progressbar" = true ]; then
+        log_message "Running checkin in progressbar mode for: $parameter"
+        checkin "$parameter" || handle_error "Check-in operation failed"
+      else
+        log_message "Launching progress app for checkin: $parameter"
+        launch_progress_app "checkin" "$parameter" ""
+      fi
       ;;
     "checkout")
       log_message "preparing for checkout script"

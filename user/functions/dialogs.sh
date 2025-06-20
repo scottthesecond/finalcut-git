@@ -81,3 +81,86 @@ show_details_off() {
         echo "DETAILS:HIDE"
     fi
 }
+
+# Function to format and display GIT output in a user-friendly way
+# Parameters:
+#   $1: git_output - The raw GIT command output
+#   $2: operation - The GIT operation being performed (e.g., "push", "pull", "clone")
+show_git_output() {
+    local git_output="$1"
+    local operation="$2"
+    
+    if [ "$progressbar" = true ] && [ -n "$git_output" ]; then
+        # Split output into lines and process each one
+        while IFS= read -r line; do
+            # Skip empty lines
+            if [ -n "$line" ]; then
+                # Format common GIT messages for better readability
+                case "$line" in
+                    *"Cloning into"*)
+                        show_details "📥 Cloning repository..."
+                        ;;
+                    *"remote: Counting objects"*)
+                        show_details "📊 Counting objects..."
+                        ;;
+                    *"remote: Compressing objects"*)
+                        show_details "🗜️  Compressing objects..."
+                        ;;
+                    *"Receiving objects"*)
+                        show_details "⬇️  Downloading files..."
+                        ;;
+                    *"Resolving deltas"*)
+                        show_details "🔗 Resolving changes..."
+                        ;;
+                    *"Unpacking objects"*)
+                        show_details "📦 Unpacking files..."
+                        ;;
+                    *"Counting objects"*)
+                        show_details "📊 Counting local objects..."
+                        ;;
+                    *"Compressing objects"*)
+                        show_details "🗜️  Compressing local objects..."
+                        ;;
+                    *"Writing objects"*)
+                        show_details "⬆️  Uploading files..."
+                        ;;
+                    *"Delta compression"*)
+                        show_details "🔗 Compressing changes..."
+                        ;;
+                    *"To "*)
+                        show_details "🌐 Connected to server"
+                        ;;
+                    *"From "*)
+                        show_details "🌐 Connected to server"
+                        ;;
+                    *"Already up to date"*)
+                        show_details "✅ Already up to date"
+                        ;;
+                    *"Updating "*)
+                        show_details "🔄 Updating files..."
+                        ;;
+                    *"Fast-forward"*)
+                        show_details "⚡ Fast-forward merge"
+                        ;;
+                    *"Merge made by"*)
+                        show_details "🔀 Merge completed"
+                        ;;
+                    *"create mode"*|*"delete mode"*|*"rename"*)
+                        show_details "📝 File changes detected"
+                        ;;
+                    *"insertions"*|*"deletions"*)
+                        show_details "📊 Processing changes..."
+                        ;;
+                    *)
+                        # For other output, show it as-is but limit length
+                        if [ ${#line} -gt 80 ]; then
+                            show_details "${line:0:77}..."
+                        else
+                            show_details "$line"
+                        fi
+                        ;;
+                esac
+            fi
+        done <<< "$git_output"
+    fi
+}

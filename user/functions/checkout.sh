@@ -12,6 +12,8 @@ set_log_message() {
 #   $1: error_message - The error message to display
 cancel_checkout() {
     local error_message="$1"
+    log_message "Cancelling checkout: $error_message"
+    show_details "Checkout cancelled: $error_message"
     handle_error "$error_message"
     log_message "Cancelling checkout. Running git reset."
     git reset --hard HEAD
@@ -60,45 +62,79 @@ prepare_repo_for_checkout() {
     
     # Make repository writable
     log_message "Making repository writable..."
+    show_details "Making repository writable..."
     if ! chmod -R u+w "$repo_path"; then
         log_message "Error: Failed to make repository writable"
+        show_details "Failed to make repository writable"
         return $RC_ERROR
     fi
     
     # Change to repository directory
     log_message "Changing to repository directory..."
+    show_details "Changing to repository directory..."
     if ! cd "$repo_path"; then
         log_message "Error: Failed to change to repository directory"
+        show_details "Failed to change to repository directory"
         return $RC_ERROR
     fi
     
     # Handle any pending changes
     log_message "Checking for pending changes..."
+    show_details "Checking for pending changes..."
     if git status | grep -q "Your branch is ahead of 'origin/master'"; then
         log_message "Local branch is ahead of origin, attempting to push first"
+        show_details "Local branch is ahead, pushing changes first..."
         push_output=$(git push 2>&1)
         push_status=$?
         if [ $push_status -ne 0 ]; then
             log_message "Error: Failed to push ahead commits"
             log_message "Push output: $push_output"
+            show_details "Failed to push ahead commits: $push_output"
+            show_git_output "$push_output" "push"
             handle_git_conflict "$repo_path"
-            return $RC_ERROR
+            conflict_status=$?
+            if [ $conflict_status -eq 0 ]; then
+                # Conflict was successfully resolved, the checkout should continue
+                log_message "Conflict resolved successfully, continuing with checkout"
+                return $RC_SUCCESS
+            else
+                # Conflict resolution failed
+                return $RC_ERROR
+            fi
+        else
+            show_details "Ahead commits pushed successfully"
+            show_git_output "$push_output" "push"
         fi
     fi
     
     # Pull latest changes
     log_message "Pulling latest changes..."
+    show_details "Pulling latest changes from server..."
     pull_output=$(git pull 2>&1)
     pull_status=$?
     if [ $pull_status -ne 0 ]; then
         log_message "Error: Failed to pull latest changes"
         log_message "Pull output: $pull_output"
+        show_details "Failed to pull latest changes: $pull_output"
+        show_git_output "$pull_output" "pull"
         handle_git_conflict "$repo_path"
-        return $RC_ERROR
+        conflict_status=$?
+        if [ $conflict_status -eq 0 ]; then
+            # Conflict was successfully resolved, the checkout should continue
+            log_message "Conflict resolved successfully, continuing with checkout"
+            return $RC_SUCCESS
+        else
+            # Conflict resolution failed
+            return $RC_ERROR
+        fi
+    else
+        show_details "Latest changes pulled successfully"
+        show_git_output "$pull_output" "pull"
     fi
     
     # Verify repository is still available after pull
     log_message "Verifying repository status..."
+    show_details "Verifying repository status..."
     if [ -f "CHECKEDOUT" ] || [ -f ".CHECKEDOUT" ]; then
         local status=$(get_checkedout_status "$repo_path")
         if [ -n "$status" ]; then
@@ -106,6 +142,7 @@ prepare_repo_for_checkout() {
             if [ "$checked_out_by" != "$CURRENT_USER" ]; then
                 log_message "Repository is already checked out by $checked_out_by"
                 log_message "Checkout reason: $commit_message"
+                show_details "Repository already checked out by $checked_out_by"
                 hide_dialog
                 echo "ALERT:Repository Already Checked Out|Repository is already checked out by $checked_out_by. Reason: $commit_message"
                 return $RC_ERROR
@@ -114,6 +151,7 @@ prepare_repo_for_checkout() {
     fi
     
     log_message "Repository prepared successfully"
+    show_details "Repository prepared successfully"
     log_message "(END PREPARE_REPO_FOR_CHECKOUT)"
     return $RC_SUCCESS
 }
@@ -163,14 +201,16 @@ checkout() {
         2)  # Needs cloning
             show_progress 30
             show_details "Repository not found locally, cloning from server..."
-            git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" 2>&1 | while read line; do
-                show_details "$line"
-            done
-            if [ $? -ne 0 ]; then
+            clone_output=$(git clone "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$selected_repo.git" "$CHECKEDIN_FOLDER/$selected_repo" 2>&1)
+            clone_status=$?
+            if [ $clone_status -ne 0 ]; then
+                show_details "Git clone failed: $clone_output"
+                show_git_output "$clone_output" "clone"
                 cancel_checkout "Git clone failed for $selected_repo"
             fi
             log_message "Repository cloned: $selected_repo"
             show_details "Repository cloned successfully"
+            show_git_output "$clone_output" "clone"
             ;;
     esac
 
