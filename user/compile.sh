@@ -80,6 +80,8 @@ scripts=(
     "$FUNCTIONS/dialogs.sh"
     "$FUNCTIONS/fcp.sh"
     "$FUNCTIONS/enable_auto_checkpoint.sh"
+    "$FUNCTIONS/offload.sh"
+    "$FUNCTIONS/verify.sh"
     "$FUNCTIONS/_main.sh"
 )
 

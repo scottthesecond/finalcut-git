@@ -231,6 +231,30 @@ if [ -n "$script" ]; then
         open "$CHECKEDOUT_FOLDER/$parameter" || handle_error "Failed to open project: $parameter"
       fi
       ;;
+    "offload")
+      log_message "preparing for offload script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse offload parameters (input_path|output_path|project_shortname|source_name|type)
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r input_path output_path project_shortname source_name type <<< "$parameter"
+        offload "$input_path" "$output_path" "$project_shortname" "$source_name" "$type" || handle_error "Offload operation failed"
+      else
+        handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
+      fi
+      ;;
+    "verify")
+      log_message "preparing for verify script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse verify parameters (source_path|destination_path)
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r source_path destination_path <<< "$parameter"
+        verify "$source_path" "$destination_path" || handle_error "Verify operation failed"
+      else
+        handle_error "Verify requires parameters: source_path|destination_path"
+      fi
+      ;;
     *)
       handle_error "Unknown script: $script"
       ;;
