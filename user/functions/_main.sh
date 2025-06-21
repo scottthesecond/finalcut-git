@@ -2,6 +2,7 @@
 
 navbar=false
 progressbar=false
+droplet=false
 script=""
 parameter=""
 SILENT_MODE=false
@@ -57,6 +58,38 @@ parse_url() {
   log_message "Parsed URL - Script: $script, Parameter: $parameter"
 }
 
+# Export SILENT_MODE for child scripts
+export SILENT_MODE
+export DEBUG_MODE
+
+# Check for droplet mode first (before argument parsing)
+if [[ "$1" == "-droplet" ]]; then
+    droplet=true
+    shift  # Remove the -droplet flag
+    
+    log_message "Running in droplet mode"
+    
+    # If no arguments left, just exit silently (opened directly)
+    if [ $# -eq 0 ]; then
+        log_message "Droplet opened directly (no files/folders dropped), exiting."
+        exit 0
+    fi
+    
+    # In droplet mode, treat all remaining arguments as folders to offload
+    for dropped_item in "$@"; do
+        log_message "Processing dropped item: $dropped_item"
+        
+        if [ -d "$dropped_item" ]; then
+            log_message "Dropped item is a directory, launching progress app for offload"
+            launch_progress_app "offload" "$dropped_item" ""
+        else
+            log_message "Dropped item is not a directory, skipping: $dropped_item"
+        fi
+    done
+    
+    exit 0
+fi
+
 # Parse arguments
 while [[ "$1" != "" ]]; do
   log_message "Processing argument: '$1'"
@@ -68,6 +101,9 @@ while [[ "$1" != "" ]]; do
     -progressbar)
       progressbar=true
       ;;
+    -droplet)
+      droplet=true
+      ;;
     --silent)
       SILENT_MODE=true
       ;;
@@ -76,7 +112,7 @@ while [[ "$1" != "" ]]; do
       ;;
       
     # Progress bar operations (when launched from status menu)
-    checkout|checkin|checkpoint)
+    checkout|checkin|checkpoint|offload)
       if [ "$progressbar" = true ]; then
         script="$1"
         shift
@@ -149,6 +185,32 @@ while [[ "$1" != "" ]]; do
       parameter="NEW"
       ;;
       
+    # Offload menu operations
+    "Set Destination")
+      script="offload_ui"
+      parameter="set_destination"
+      ;;
+    "Video"|"✓ Video")
+      script="offload_ui"
+      parameter="set_type|video"
+      ;;
+    "Audio"|"✓ Audio")
+      script="offload_ui"
+      parameter="set_type|audio"
+      ;;
+    "Photo"|"✓ Photo")
+      script="offload_ui"
+      parameter="set_type|photo"
+      ;;
+    "Maintain Folder Structure"|"✓ Maintain Folder Structure")
+      script="offload_ui"
+      parameter="set_type|maintain"
+      ;;
+    "Offload")
+      script="offload_ui"
+      parameter="launch_droplet"
+      ;;
+      
     # Default case for direct script/parameter pairs and quoted project names
     *)
       if [ -z "$script" ]; then
@@ -165,10 +227,6 @@ done
 # Log the final script and parameter values
 log_message "Script: $script"
 log_message "Parameter: $parameter"
-
-# Export SILENT_MODE for child scripts
-export SILENT_MODE
-export DEBUG_MODE
 
 # Execute the requested script if one was specified
 if [ -n "$script" ]; then
@@ -235,12 +293,17 @@ if [ -n "$script" ]; then
       log_message "preparing for offload script"
       log_message "Parameter value: '$parameter'"
       
-      # Parse offload parameters (input_path|output_path|project_shortname|source_name|type)
-      if [ -n "$parameter" ]; then
-        IFS='|' read -r input_path output_path project_shortname source_name type <<< "$parameter"
-        offload "$input_path" "$output_path" "$project_shortname" "$source_name" "$type" || handle_error "Offload operation failed"
+      if [ "$progressbar" = true ]; then
+        log_message "Running offload in progressbar mode"
+        run_offload_with_progress "$parameter" || handle_error "Offload operation failed"
       else
-        handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
+        # Parse offload parameters (input_path|output_path|project_shortname|source_name|type)
+        if [ -n "$parameter" ]; then
+          IFS='|' read -r input_path output_path project_shortname source_name type <<< "$parameter"
+          offload "$input_path" "$output_path" "$project_shortname" "$source_name" "$type" || handle_error "Offload operation failed"
+        else
+          handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
+        fi
       fi
       ;;
     "verify")
@@ -253,6 +316,31 @@ if [ -n "$script" ]; then
         verify "$source_path" "$destination_path" || handle_error "Verify operation failed"
       else
         handle_error "Verify requires parameters: source_path|destination_path"
+      fi
+      ;;
+    "offload_ui")
+      log_message "preparing for offload UI script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse offload UI parameters
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r action type <<< "$parameter"
+        case $action in
+          "set_destination")
+            set_offload_destination || handle_error "Failed to set destination"
+            ;;
+          "set_type")
+            set_offload_type "$type" || handle_error "Failed to set type"
+            ;;
+          "launch_droplet")
+            launch_offload_droplet || handle_error "Failed to launch droplet"
+            ;;
+          *)
+            handle_error "Unknown offload UI action: $action"
+            ;;
+        esac
+      else
+        handle_error "Offload UI requires parameters: action|type"
       fi
       ;;
     *)
@@ -317,7 +405,9 @@ display_navbar_menu() {
     echo "----"
     echo "DISABLED|$APP_NAME Version $VERSION"
     echo "Setup"
-    echo "----"
+    
+    # Add offload submenu at the bottom
+    display_offload_submenu
 }
 
 # Handle navbar mode display

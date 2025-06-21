@@ -81,6 +81,7 @@ scripts=(
     "$FUNCTIONS/fcp.sh"
     "$FUNCTIONS/enable_auto_checkpoint.sh"
     "$FUNCTIONS/offload.sh"
+    "$FUNCTIONS/offload_ui.sh"
     "$FUNCTIONS/verify.sh"
     "$FUNCTIONS/_main.sh"
 )
@@ -173,8 +174,28 @@ if [ "$build_with_platypus" = true ]; then
         "$SCRIPT_DIR/build/fcp-git-user.sh"\
         "$SCRIPT_DIR/build/$progress_out_app"
     
-    # Build the status menu app with Platypus (including progress app as bundled file)
-    echo "Building status menu app with bundled progress app..."
+    # Build the offload droplet app with Platypus
+    echo "Building offload droplet app..."
+    droplet_app_name="$NAME Offload Droplet"
+    droplet_out_app="$droplet_app_name.app"
+    
+    /usr/local/bin/platypus \
+        --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
+        --background \
+        --name "$droplet_app_name"\
+        --app-version "$VERSION"\
+        --author "Unnamed Media"\
+        --interface-type 'Droplet'\
+        --interpreter '/bin/bash'\
+        --script-args '-droplet'\
+        --droppable \
+        --uniform-type-identifiers 'public.folder|public.item'\
+        --bundled-file "$output_file"\
+        "$SCRIPT_DIR/build/fcp-git-user.sh"\
+        "$SCRIPT_DIR/build/$droplet_out_app"
+    
+    # Build the status menu app with Platypus (including progress app and droplet as bundled files)
+    echo "Building status menu app with bundled progress app and droplet..."
     /usr/local/bin/platypus \
         --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
         --background \
@@ -192,6 +213,7 @@ if [ "$build_with_platypus" = true ]; then
         --uniform-type-identifiers 'public.item|public.folder'\
         --bundled-file "$output_file"\
         --bundled-file "$SCRIPT_DIR/build/$progress_out_app"\
+        --bundled-file "$SCRIPT_DIR/build/$droplet_out_app"\
         "$SCRIPT_DIR/build/fcp-git-user.sh"\
         "$SCRIPT_DIR/build/$OUT_APP"
   
