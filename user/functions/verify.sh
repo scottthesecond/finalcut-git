@@ -48,6 +48,7 @@ verify_with_source_offload() {
     local destination_path="$3"
     
     log_message "Verifying files using source .offload file"
+    show_details "Verifying files using source .offload file"
     
     local total_files=$(wc -l < "$source_offload_file")
     local current_file=0
@@ -59,14 +60,23 @@ verify_with_source_offload() {
     local temp_dest_offload="$destination_path/.offload.tmp"
     > "$temp_dest_offload"
     
+    show_details "Starting verification of $total_files files..."
+    show_progress 10
+    
     while IFS='|' read -r source_file dest_file new_filename status; do
         ((current_file++))
         
+        # Calculate progress percentage (10-90% range for verification phase)
+        local progress=$((10 + (current_file * 80 / total_files)))
+        show_progress $progress
+        
         log_message "Verifying file $current_file/$total_files: $new_filename"
+        show_details "Verifying file $current_file/$total_files..."
         
         # Check if source file exists
         if [ ! -f "$source_file" ]; then
             log_message "ERROR: Source file not found: $source_file"
+            show_details "✗ Source file not found: $(basename "$source_file")"
             # Update status to failed
             sed -i '' "${current_file}s/$status$/failed/" "$source_offload_file"
             echo "$new_filename|$(basename "$source_file")|failed|0|0|" >> "$temp_dest_offload"
@@ -77,6 +87,7 @@ verify_with_source_offload() {
         # Check if destination file exists
         if [ ! -f "$dest_file" ]; then
             log_message "ERROR: Destination file not found: $dest_file"
+            show_details "✗ Destination file not found: $new_filename"
             # Update status to failed
             sed -i '' "${current_file}s/$status$/failed/" "$source_offload_file"
             echo "$new_filename|$(basename "$source_file")|failed|0|0|" >> "$temp_dest_offload"
@@ -97,6 +108,7 @@ verify_with_source_offload() {
         # Verify sizes match
         if [ "$source_size" != "$dest_size" ]; then
             log_message "ERROR: Size mismatch for $new_filename (source: $source_size, dest: $dest_size)"
+            show_details "✗ Size mismatch for $new_filename"
             # Update status to failed
             sed -i '' "${current_file}s/$status$/failed/" "$source_offload_file"
             echo "$new_filename|$(basename "$source_file")|failed|$source_size|$dest_size|$source_hash|$dest_hash" >> "$temp_dest_offload"
@@ -109,6 +121,7 @@ verify_with_source_offload() {
             log_message "ERROR: Hash mismatch for $new_filename"
             log_message "Source hash: $source_hash"
             log_message "Dest hash: $dest_hash"
+            show_details "✗ Hash mismatch for $new_filename"
             # Update status to failed
             sed -i '' "${current_file}s/$status$/failed/" "$source_offload_file"
             echo "$new_filename|$(basename "$source_file")|failed|$source_size|$dest_size|$source_hash|$dest_hash" >> "$temp_dest_offload"
@@ -121,12 +134,21 @@ verify_with_source_offload() {
         echo "$new_filename|$(basename "$source_file")|verified|$source_size|$dest_size|$source_hash|$dest_hash" >> "$temp_dest_offload"
         
         log_message "✓ Verified: $new_filename (size: $source_size, hash: ${source_hash:0:8}...)"
+        show_details "✓ Verified: $new_filename"
         ((verified_count++))
         
     done < "$source_offload_file"
     
     # Replace destination .offload file with updated version
     mv "$temp_dest_offload" "$dest_offload_file"
+    
+    show_progress 100
+    show_details "Verification complete!"
+    show_details "Total files: $total_files"
+    show_details "Verified: $verified_count"
+    if [ "$failed_count" -gt 0 ]; then
+        show_details "Failed: $failed_count"
+    fi
     
     log_message "Verification complete!"
     log_message "Total files: $total_files"
@@ -143,6 +165,7 @@ verify_with_destination_offload() {
     local dest_offload_file="$3"
     
     log_message "Verifying files using destination .offload file"
+    show_details "Verifying files using destination .offload file"
     
     local total_files=$(wc -l < "$dest_offload_file")
     local current_file=0
@@ -153,10 +176,18 @@ verify_with_destination_offload() {
     local temp_dest_offload="$destination_path/.offload.tmp"
     > "$temp_dest_offload"
     
+    show_details "Starting verification of $total_files files..."
+    show_progress 10
+    
     while IFS='|' read -r new_filename original_filename status source_size dest_size source_hash dest_hash; do
         ((current_file++))
         
+        # Calculate progress percentage (10-90% range for verification phase)
+        local progress=$((10 + (current_file * 80 / total_files)))
+        show_progress $progress
+        
         log_message "Verifying file $current_file/$total_files: $new_filename"
+        show_details "Verifying file $current_file/$total_files..."
         
         # Construct file paths
         local source_file="$source_path/$original_filename"
@@ -165,6 +196,7 @@ verify_with_destination_offload() {
         # Check if source file exists
         if [ ! -f "$source_file" ]; then
             log_message "ERROR: Source file not found: $source_file"
+            show_details "✗ Source file not found: $original_filename"
             echo "$new_filename|$original_filename|failed|0|0||" >> "$temp_dest_offload"
             ((failed_count++))
             continue
@@ -173,6 +205,7 @@ verify_with_destination_offload() {
         # Check if destination file exists
         if [ ! -f "$dest_file" ]; then
             log_message "ERROR: Destination file not found: $dest_file"
+            show_details "✗ Destination file not found: $new_filename"
             echo "$new_filename|$original_filename|failed|0|0||" >> "$temp_dest_offload"
             ((failed_count++))
             continue
@@ -188,6 +221,7 @@ verify_with_destination_offload() {
         # Verify sizes match
         if [ "$current_source_size" != "$current_dest_size" ]; then
             log_message "ERROR: Size mismatch for $new_filename (source: $current_source_size, dest: $current_dest_size)"
+            show_details "✗ Size mismatch for $new_filename"
             echo "$new_filename|$original_filename|failed|$current_source_size|$current_dest_size|$current_source_hash|$current_dest_hash" >> "$temp_dest_offload"
             ((failed_count++))
             continue
@@ -198,6 +232,7 @@ verify_with_destination_offload() {
             log_message "ERROR: Hash mismatch for $new_filename"
             log_message "Source hash: $current_source_hash"
             log_message "Dest hash: $current_dest_hash"
+            show_details "✗ Hash mismatch for $new_filename"
             echo "$new_filename|$original_filename|failed|$current_source_size|$current_dest_size|$current_source_hash|$current_dest_hash" >> "$temp_dest_offload"
             ((failed_count++))
             continue
@@ -206,12 +241,21 @@ verify_with_destination_offload() {
         echo "$new_filename|$original_filename|verified|$current_source_size|$current_dest_size|$current_source_hash|$current_dest_hash" >> "$temp_dest_offload"
         
         log_message "✓ Verified: $new_filename (size: $current_source_size, hash: ${current_source_hash:0:8}...)"
+        show_details "✓ Verified: $new_filename"
         ((verified_count++))
         
     done < "$dest_offload_file"
     
     # Replace destination .offload file with updated version
     mv "$temp_dest_offload" "$dest_offload_file"
+    
+    show_progress 100
+    show_details "Verification complete!"
+    show_details "Total files: $total_files"
+    show_details "Verified: $verified_count"
+    if [ "$failed_count" -gt 0 ]; then
+        show_details "Failed: $failed_count"
+    fi
     
     log_message "Verification complete!"
     log_message "Total files: $total_files"
@@ -230,6 +274,15 @@ verify() {
     log_message "Source: $source_path"
     log_message "Destination: $destination_path"
     
+    # Show initial progress and details
+    show_progress 5
+    show_details_on
+    show_details "Starting verification process..."
+    show_details "Source: $(basename "$source_path")"
+    if [ -n "$destination_path" ]; then
+        show_details "Destination: $(basename "$destination_path")"
+    fi
+    
     # Validate parameters
     validate_verify_params "$source_path" "$destination_path"
     
@@ -237,6 +290,7 @@ verify() {
     local source_offload_file="$source_path/.offload"
     if [ -f "$source_offload_file" ]; then
         log_message "Found source .offload file: $source_offload_file"
+        show_details "Found source .offload file"
         
         # Determine destination path from source .offload if not provided
         if [ -z "$destination_path" ]; then
@@ -246,6 +300,7 @@ verify() {
                 IFS='|' read -r source_file dest_file new_filename status <<< "$first_line"
                 destination_path=$(dirname "$dest_file")
                 log_message "Extracted destination path from .offload file: $destination_path"
+                show_details "Extracted destination path from .offload file"
             else
                 handle_error "Cannot determine destination path from .offload file"
             fi
@@ -255,6 +310,7 @@ verify() {
         
     else
         log_message "No source .offload file found"
+        show_details "No source .offload file found"
         
         # Check if destination path is provided
         if [ -z "$destination_path" ]; then
@@ -265,6 +321,7 @@ verify() {
         local dest_offload_file="$destination_path/.offload"
         if [ -f "$dest_offload_file" ]; then
             log_message "Found destination .offload file: $dest_offload_file"
+            show_details "Found destination .offload file"
             verify_with_destination_offload "$source_path" "$destination_path" "$dest_offload_file"
         else
             handle_error "No .offload file found in source or destination"

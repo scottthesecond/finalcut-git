@@ -8,8 +8,6 @@ parameter=""
 SILENT_MODE=false
 DEBUG_MODE=false
 
-enable_auto_checkpoint
-
 # Function to launch progress bar app for long operations
 launch_progress_app() {
     local operation="$1"
@@ -61,6 +59,9 @@ parse_url() {
 # Export SILENT_MODE for child scripts
 export SILENT_MODE
 export DEBUG_MODE
+export navbar
+export progressbar
+export droplet
 
 # Check for droplet mode first (before argument parsing)
 if [[ "$1" == "-droplet" ]]; then
@@ -80,8 +81,36 @@ if [[ "$1" == "-droplet" ]]; then
         log_message "Processing dropped item: $dropped_item"
         
         if [ -d "$dropped_item" ]; then
-            log_message "Dropped item is a directory, launching progress app for offload"
-            launch_progress_app "offload" "$dropped_item" ""
+            log_message "Dropped item is a directory, prompting for card name"
+            
+            # Prompt for card name using AppleScript with proper button handling
+            result=$(osascript -e 'display dialog "Enter a name for this card:" default answer "" buttons {"Cancel", "OK"} default button "OK"' 2>&1)
+            osascript_status=$?
+            
+            # Check if osascript failed
+            if [ $osascript_status -ne 0 ]; then
+                log_message "Error: Failed to display card name dialog. Status: $osascript_status, Error: $result"
+                continue
+            fi
+            
+            log_message "Result: $result"
+
+            # Parse the result
+            button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
+            card_name=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
+            
+            if [ "$button_clicked" = "Cancel" ]; then
+                log_message "User canceled card name dialog"
+                continue
+            fi
+            
+            if [ -n "$card_name" ]; then
+                log_message "Card name entered: $card_name"
+                # Launch progress app with card name as additional parameter
+                launch_progress_app "offload" "$dropped_item" "$card_name"
+            else
+                log_message "No card name entered, skipping offload"
+            fi
         else
             log_message "Dropped item is not a directory, skipping: $dropped_item"
         fi
@@ -118,6 +147,13 @@ while [[ "$1" != "" ]]; do
         shift
         if [ -n "$1" ]; then
           parameter="$1"
+          # For offload, also capture the card name as the third argument
+          if [ "$script" = "offload" ] && [ -n "$2" ]; then
+            shift
+            # Store the card name in a way that can be accessed later
+            CARD_NAME="$1"
+            log_message "Captured card name for offload: $CARD_NAME"
+          fi
         fi
         break
       fi
@@ -190,6 +226,10 @@ while [[ "$1" != "" ]]; do
       script="offload_ui"
       parameter="set_destination"
       ;;
+    "Set Project Shortname")
+      script="offload_ui"
+      parameter="set_project_shortname"
+      ;;
     "Video"|"✓ Video")
       script="offload_ui"
       parameter="set_type|video"
@@ -223,6 +263,9 @@ while [[ "$1" != "" ]]; do
   esac
   shift
 done
+
+# Enable auto checkpoint only in statusbar mode (after argument parsing)
+enable_auto_checkpoint
 
 # Log the final script and parameter values
 log_message "Script: $script"
@@ -292,15 +335,41 @@ if [ -n "$script" ]; then
     "offload")
       log_message "preparing for offload script"
       log_message "Parameter value: '$parameter'"
+      log_message "Card name: '$CARD_NAME'"
       
       if [ "$progressbar" = true ]; then
         log_message "Running offload in progressbar mode"
-        run_offload_with_progress "$parameter" || handle_error "Offload operation failed"
+        
+        # For droplet calls, the parameter is the input path and CARD_NAME is the card name
+        if [ -n "$parameter" ] && [ -n "$CARD_NAME" ]; then
+          log_message "Droplet mode: input_path='$parameter', card_name='$CARD_NAME'"
+          run_offload_with_progress "$parameter" "$CARD_NAME" || handle_error "Offload operation failed"
+        else
+          # For other offload calls, parse the parameter as pipe-separated values
+          if [ -n "$parameter" ]; then
+            IFS='|' read -r input_path output_path project_shortname source_name type <<< "$parameter"
+            
+            # If source_name is empty, use the card name from CARD_NAME
+            if [ -z "$source_name" ] && [ -n "$CARD_NAME" ]; then
+              source_name="$CARD_NAME"
+              log_message "Using card name as source name: $source_name"
+            fi
+            
+            run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
+          else
+            handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
+          fi
+        fi
       else
         # Parse offload parameters (input_path|output_path|project_shortname|source_name|type)
         if [ -n "$parameter" ]; then
           IFS='|' read -r input_path output_path project_shortname source_name type <<< "$parameter"
-          offload "$input_path" "$output_path" "$project_shortname" "$source_name" "$type" || handle_error "Offload operation failed"
+          
+          # Get and increment the counter for direct offload calls
+          local counter=$(increment_offload_counter)
+          log_message "Using counter: $counter for direct offload"
+          
+          offload "$input_path" "$output_path" "$project_shortname" "$source_name" "$type" "$counter" || handle_error "Offload operation failed"
         else
           handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
         fi
@@ -328,6 +397,9 @@ if [ -n "$script" ]; then
         case $action in
           "set_destination")
             set_offload_destination || handle_error "Failed to set destination"
+            ;;
+          "set_project_shortname")
+            prompt_project_shortname || handle_error "Failed to set project shortname"
             ;;
           "set_type")
             set_offload_type "$type" || handle_error "Failed to set type"

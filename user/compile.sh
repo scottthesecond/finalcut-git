@@ -142,13 +142,30 @@ if [ "$build_with_platypus" = true ]; then
     OUT_APP="$NAME.app"
     APPLICATIONS_DIR="/Applications"
 
-    # Check if the app is running and quit it
+    # Check if any of the UNFlab apps are running and quit them
+    progress_app_name="$NAME Progress"
+    droplet_app_name="$NAME Offload Droplet"
+    
+    # Quit main UNFlab app
     if pgrep -f "$NAME.app" > /dev/null; then
         echo "Quitting existing $NAME application..."
         pkill -f "$NAME.app"
-        # Give it a moment to quit
-        sleep 2
     fi
+    
+    # Quit progress bar app
+    if pgrep -f "$progress_app_name.app" > /dev/null; then
+        echo "Quitting existing $progress_app_name application..."
+        pkill -f "$progress_app_name.app"
+    fi
+    
+    # Quit droplet app
+    if pgrep -f "$droplet_app_name.app" > /dev/null; then
+        echo "Quitting existing $droplet_app_name application..."
+        pkill -f "$droplet_app_name.app"
+    fi
+    
+    # Give apps a moment to quit
+    sleep 2
 
     # Remove existing app from Applications if it exists
     if [ -d "$APPLICATIONS_DIR/$OUT_APP" ]; then
@@ -158,7 +175,6 @@ if [ "$build_with_platypus" = true ]; then
 
     # Build the progress bar app with Platypus (using same script)
     echo "Building progress bar app..."
-    progress_app_name="$NAME Progress"
     progress_out_app="$progress_app_name.app"
     
     /usr/local/bin/platypus \
@@ -176,7 +192,6 @@ if [ "$build_with_platypus" = true ]; then
     
     # Build the offload droplet app with Platypus
     echo "Building offload droplet app..."
-    droplet_app_name="$NAME Offload Droplet"
     droplet_out_app="$droplet_app_name.app"
     
     /usr/local/bin/platypus \

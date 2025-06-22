@@ -33,6 +33,24 @@ set_offload_config() {
     log_message "Set offload config: OFFLOAD_${config_key}=${config_value}"
 }
 
+# Function to get current offload counter
+get_offload_counter() {
+    local counter=$(get_offload_config "COUNTER")
+    if [ -z "$counter" ]; then
+        echo "1"
+    else
+        echo "$counter"
+    fi
+}
+
+# Function to increment offload counter
+increment_offload_counter() {
+    local current_counter=$(get_offload_counter)
+    local new_counter=$((current_counter + 1))
+    set_offload_config "COUNTER" "$new_counter" > /dev/null
+    echo "$current_counter"
+}
+
 # Function to get current offload destination
 get_offload_destination() {
     local dest=$(get_offload_config "DESTINATION")
@@ -53,12 +71,51 @@ get_offload_type() {
     fi
 }
 
+# Function to get current project shortname
+get_project_shortname() {
+    local shortname=$(get_offload_config "PROJECT_SHORTNAME")
+    if [ -z "$shortname" ]; then
+        echo "PROJ"
+    else
+        echo "$shortname"
+    fi
+}
+
+# Function to set project shortname
+set_project_shortname() {
+    local shortname="$1"
+    if [ -n "$shortname" ]; then
+        set_offload_config "PROJECT_SHORTNAME" "$shortname"
+        echo "Project shortname set to: $shortname"
+    else
+        echo "No shortname provided"
+    fi
+}
+
+# Function to prompt for project shortname
+prompt_project_shortname() {
+    local current_shortname=$(get_project_shortname)
+    local new_shortname=$(osascript <<EOF
+display dialog "Enter project shortname:" default answer "$current_shortname"
+text returned of result
+EOF
+)
+    
+    if [ -n "$new_shortname" ]; then
+        set_project_shortname "$new_shortname"
+        echo "Project shortname set to: $new_shortname"
+    else
+        echo "No shortname entered"
+    fi
+}
+
 # Function to set offload destination using folder picker
 set_offload_destination() {
-    local selected_path=$(osascript -e 'tell application "System Events"
-        set theFolder to choose folder with prompt "Select offload destination folder:"
-        return POSIX path of theFolder
-    end tell' 2>/dev/null)
+    local selected_path=$(osascript <<'EOF'
+set theFolder to choose folder with prompt "Select offload destination folder:"
+return POSIX path of theFolder
+EOF
+)
     
     if [ -n "$selected_path" ]; then
         set_offload_config "DESTINATION" "$selected_path"
@@ -86,6 +143,7 @@ set_offload_type() {
 display_offload_submenu() {
     local current_dest=$(get_offload_destination)
     local current_type=$(get_offload_type)
+    local current_shortname=$(get_project_shortname)
     
     # Build submenu items string
     local submenu_items=""
@@ -93,6 +151,11 @@ display_offload_submenu() {
     # Destination section
     submenu_items="DISABLED|Destination: $current_dest"
     submenu_items="$submenu_items|Set Destination"
+    submenu_items="$submenu_items|----"
+    
+    # Project shortname section
+    submenu_items="$submenu_items|DISABLED|Project: $current_shortname"
+    submenu_items="$submenu_items|Set Project Shortname"
     submenu_items="$submenu_items|----"
     
     # Type selection
@@ -134,6 +197,9 @@ handle_offload_menu() {
     case "$menu_item" in
         "Set Destination")
             set_offload_destination
+            ;;
+        "Set Project Shortname")
+            prompt_project_shortname
             ;;
         "Video")
             set_offload_type "video"
@@ -186,34 +252,76 @@ launch_offload_droplet() {
 # Function to run offload with progress bar
 run_offload_with_progress() {
     local input_path="$1"
-    local dest=$(get_offload_config "DESTINATION")
+    local provided_source_name="$2"
+    local base_dest=$(get_offload_config "DESTINATION")
     local type=$(get_offload_config "TYPE")
     
-    if [ -z "$dest" ]; then
+    if [ -z "$base_dest" ]; then
         handle_error "Offload destination not set"
     fi
     
     # Generate project shortname and source name from input path
-    local project_shortname="PROJ"
-    local source_name=$(basename "$input_path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+    local project_shortname=$(get_project_shortname)
+    local source_name
+    
+    # Use provided source name if available, otherwise generate from input path
+    if [ -n "$provided_source_name" ]; then
+        source_name=$(echo "$provided_source_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+        log_message "Using provided source name: $provided_source_name (sanitized: $source_name)"
+    else
+        source_name=$(basename "$input_path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+        log_message "Generated source name from input path: $source_name"
+    fi
     
     if [ -z "$source_name" ]; then
         source_name="source"
     fi
     
+    # Get and increment the counter
+    local counter=$(increment_offload_counter)
+    local type_prefix
+    case "$type" in
+        video|v) type_prefix="v" ;;
+        audio|a) type_prefix="a" ;;
+        photo|p) type_prefix="p" ;;
+        maintain|m) type_prefix="m" ;;
+        *) type_prefix="v" ;;
+    esac
+    
+    # Create destination folder with the new naming scheme
+    local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
+    local full_dest_path="$base_dest/$dest_folder"
+    
     log_message "Running offload in progress mode"
     log_message "Input: $input_path"
-    log_message "Output: $dest"
+    log_message "Base Output: $base_dest"
+    log_message "Destination Folder: $dest_folder"
+    log_message "Full Output: $full_dest_path"
     log_message "Type: $type"
     log_message "Project: $project_shortname"
     log_message "Source: $source_name"
+    log_message "Counter: $counter"
     
     # Run offload
-    offload "$input_path" "$dest" "$project_shortname" "$source_name" "$type" || handle_error "Offload operation failed"
+    local offload_result
+    offload_result=$(offload "$input_path" "$full_dest_path" "$project_shortname" "$source_name" "$type" "$counter")
+    local offload_exit_code=$?
     
-    # Run verification
-    log_message "Starting verification after offload"
-    verify "$input_path" "$dest" || handle_error "Verification failed"
+    # Check if offload returned early (resume, retry, or re-verify)
+    if [ $offload_exit_code -eq 0 ]; then
+        # Check the result message to determine if it was a special operation
+        if echo "$offload_result" | grep -q "Resume complete\|Retry complete\|Re-verification complete\|Offload cancelled"; then
+            log_message "Offload operation completed: $offload_result"
+            echo "$offload_result"
+            return 0
+        fi
+    elif [ $offload_exit_code -ne 0 ]; then
+        handle_error "Offload operation failed"
+    fi
+    
+    # If we get here, it was a new offload, so run verification
+    log_message "Starting verification after new offload"
+    verify "$input_path" "$full_dest_path" || handle_error "Verification failed"
     
     log_message "Offload and verification complete"
     echo "Offload and verification complete!"

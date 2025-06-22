@@ -1,6 +1,14 @@
 enable_auto_checkpoint() {
     log_message "(BEGIN ENABLE_AUTO_CHECKPOINT)"
     
+    # Only run in statusbar mode (when no other mode flags are set)
+    if [ "$navbar" = true ] || [ "$progressbar" = true ] || [ "$droplet" = true ]; then
+        log_message "Skipping enable_auto_checkpoint - not in statusbar mode (navbar=$navbar, progressbar=$progressbar, droplet=$droplet)"
+        return 0
+    fi
+    
+    log_message "Running enable_auto_checkpoint in statusbar mode"
+    
     # Create the LaunchAgent directory if it doesn't exist
     LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
     mkdir -p "$LAUNCH_AGENT_DIR"
