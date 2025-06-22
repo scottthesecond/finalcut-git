@@ -266,10 +266,10 @@ run_offload_with_progress() {
     
     # Use provided source name if available, otherwise generate from input path
     if [ -n "$provided_source_name" ]; then
-        source_name=$(echo "$provided_source_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+        source_name=$(echo "$provided_source_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g')
         log_message "Using provided source name: $provided_source_name (sanitized: $source_name)"
     else
-        source_name=$(basename "$input_path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+        source_name=$(basename "$input_path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g')
         log_message "Generated source name from input path: $source_name"
     fi
     
