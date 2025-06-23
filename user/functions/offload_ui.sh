@@ -33,6 +33,17 @@ set_offload_config() {
     log_message "Set offload config: OFFLOAD_${config_key}=${config_value}"
 }
 
+# Function to initialize default offload settings
+initialize_offload_defaults() {
+    # Only initialize if config file doesn't exist or TYPE is not set
+    if [ ! -f "$CONFIG_FILE" ] || [ -z "$(get_offload_config "TYPE")" ]; then
+        log_message "Initializing default offload settings"
+        set_offload_config "TYPE" "video"
+        set_offload_config "PROJECT_SHORTNAME" "PROJ"
+        set_offload_config "COUNTER" "1"
+    fi
+}
+
 # Function to get current offload counter
 get_offload_counter() {
     local counter=$(get_offload_config "COUNTER")
@@ -63,6 +74,9 @@ get_offload_destination() {
 
 # Function to get current offload type
 get_offload_type() {
+    # Initialize defaults if needed
+    initialize_offload_defaults
+    
     local type=$(get_offload_config "TYPE")
     if [ -z "$type" ]; then
         echo "video"
@@ -222,7 +236,7 @@ handle_offload_menu() {
 # Function to launch offload droplet
 launch_offload_droplet() {
     local dest=$(get_offload_config "DESTINATION")
-    local type=$(get_offload_config "TYPE")
+    local type=$(get_offload_type)
     
     if [ -z "$dest" ]; then
         handle_error "Offload destination not set. Please set a destination first."
@@ -251,7 +265,7 @@ run_offload_with_progress() {
     local input_path="$1"
     local provided_source_name="$2"
     local base_dest=$(get_offload_config "DESTINATION")
-    local type=$(get_offload_config "TYPE")
+    local type=$(get_offload_type)
     
     if [ -z "$base_dest" ]; then
         handle_error "Offload destination not set"
