@@ -22,37 +22,19 @@ should_skip_file() {
     local extension=$(echo "${file_path##*.}" | tr '[:upper:]' '[:lower:]')
     local filename=$(basename "$file_path")
     
-    # Skip .fseventsd folders for all types
-    if [[ "$filename" == ".fseventsd" ]]; then
-        reason="Skip .fseventsd folder"
-        echo "$reason"
-        return 0
-    fi
+    # Skip system files for all types
+    case "$filename" in
+        .fseventsd|fseventsd-uuid|.ignore|.offload|.hedge-enabled)
+            reason="Skip system file: $filename"
+            echo "$reason"
+            return 0
+            ;;
+    esac
     
-    # Skip fseventsd-uuid files for all types
-    if [[ "$filename" == "fseventsd-uuid" ]]; then
-        reason="Skip fseventsd-uuid file"
-        echo "$reason"
-        return 0
-    fi
-    
-    # Skip .ignore files for all types
-    if [[ "$filename" == ".ignore" ]]; then
-        reason="Skip .ignore file"
-        echo "$reason"
-        return 0
-    fi
-    
-    # Skip .offload files for all types
-    if [[ "$filename" == ".offload" ]]; then
-        reason="Skip .offload file"
-        echo "$reason"
-        return 0
-    fi
-    
-    # Skip .hedge-enabled files for all types
-    if [[ "$filename" == ".hedge-enabled" ]]; then
-        reason="Skip .hedge-enabled file"
+    # Skip files within hidden folders
+    local dir_path=$(dirname "$file_path")
+    if [[ "$dir_path" == *"/."* ]]; then
+        reason="Skip file in hidden folder: $(basename "$dir_path")"
         echo "$reason"
         return 0
     fi
@@ -70,7 +52,7 @@ should_skip_file() {
     # Audio type skips
     if [[ "$type" =~ ^(audio|a)$ ]]; then
         case "$extension" in
-            sys|zst)
+            sys|zst|dat|db|url)
                 reason="Audio skip: $extension file"
                 echo "$reason"
                 return 0
@@ -80,7 +62,7 @@ should_skip_file() {
     # Video type skips
     if [[ "$type" =~ ^(video|v)$ ]]; then
         case "$extension" in
-            thumbs|xml|ctg|dat|cpc|cpg|b00|d00|scr|thm|log|jpg|tbl|dat)
+            thumbs|xml|ctg|dat|cpc|cpg|b00|d00|scr|thm|log|jpg|tbl)
                 reason="Video skip: $extension file"
                 echo "$reason"
                 return 0
@@ -89,6 +71,34 @@ should_skip_file() {
     fi
     
     return 1  # do not skip
+}
+
+# Function to generate filename with original name in parentheses for all file types (except maintain mode)
+generate_filename_with_original() {
+    local file_path="$1"
+    local type_prefix="$2"
+    local counter="$3"
+    local project_shortname="$4"
+    local source_name="$5"
+    local file_counter="$6"
+    local type="$7"
+    
+    local extension="${file_path##*.}"
+    local original_filename=$(basename "$file_path" ".$extension")
+    
+    # For maintain mode, use original naming scheme without parentheses
+    if [[ "$type" =~ ^(maintain|m)$ ]]; then
+        echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).${extension}"
+    else
+        # For all other types, include original filename in parentheses
+        # Sanitize original filename for use in parentheses (remove special chars, limit length)
+        local sanitized_original=$(echo "$original_filename" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g' | cut -c1-20)
+        if [ -n "$sanitized_original" ]; then
+            echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).(${sanitized_original}).${extension}"
+        else
+            echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).${extension}"
+        fi
+    fi
 }
 
 # Function to scan input directory and build file list
@@ -139,7 +149,7 @@ scan_input_directory() {
         local extension="${file_path##*.}"
         
         # Generate new filename with counter
-        local new_filename="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).${extension}"
+        local new_filename=$(generate_filename_with_original "$file_path" "$type_prefix" "$counter" "$project_shortname" "$source_name" "$file_counter" "$type")
         
         # Determine destination path based on type
         local dest_path
