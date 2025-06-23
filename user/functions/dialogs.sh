@@ -74,10 +74,6 @@ show_details() {
     if [ "$progressbar" = true ]; then
         echo "$message"
     fi
-    # Add debug logging to help troubleshoot
-    if [ "$DEBUG_MODE" = true ]; then
-        echo "DEBUG: show_details called with message='$message', progressbar='$progressbar'" >&2
-    fi
 }
 
 show_details_on() {

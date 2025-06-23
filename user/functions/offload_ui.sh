@@ -128,15 +128,12 @@ EOF
 # Function to set offload type
 set_offload_type() {
     local type="$1"
-    case "$type" in
-        video|audio|photo|maintain)
-            set_offload_config "TYPE" "$type"
-            echo "Offload type set to: $type"
-            ;;
-        *)
-            echo "Invalid type: $type"
-            ;;
-    esac
+    if validate_offload_type "$type"; then
+        set_offload_config "TYPE" "$type"
+        echo "Offload type set to: $type"
+    else
+        echo "Invalid type: $type"
+    fi
 }
 
 # Function to display offload submenu
@@ -262,31 +259,11 @@ run_offload_with_progress() {
     
     # Generate project shortname and source name from input path
     local project_shortname=$(get_project_shortname)
-    local source_name
-    
-    # Use provided source name if available, otherwise generate from input path
-    if [ -n "$provided_source_name" ]; then
-        source_name=$(echo "$provided_source_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g')
-        log_message "Using provided source name: $provided_source_name (sanitized: $source_name)"
-    else
-        source_name=$(basename "$input_path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g')
-        log_message "Generated source name from input path: $source_name"
-    fi
-    
-    if [ -z "$source_name" ]; then
-        source_name="source"
-    fi
+    local source_name=$(sanitize_source_name "$provided_source_name" "$input_path")
     
     # Get and increment the counter
     local counter=$(increment_offload_counter)
-    local type_prefix
-    case "$type" in
-        video|v) type_prefix="v" ;;
-        audio|a) type_prefix="a" ;;
-        photo|p) type_prefix="p" ;;
-        maintain|m) type_prefix="m" ;;
-        *) type_prefix="v" ;;
-    esac
+    local type_prefix=$(get_type_prefix "$type")
     
     # Create destination folder with the new naming scheme
     local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
@@ -303,18 +280,15 @@ run_offload_with_progress() {
     log_message "Counter: $counter"
     
     # Run offload
-    local offload_result
-    offload_result=$(offload "$input_path" "$full_dest_path" "$project_shortname" "$source_name" "$type" "$counter")
+    offload "$input_path" "$full_dest_path" "$project_shortname" "$source_name" "$type" "$counter"
     local offload_exit_code=$?
     
     # Check if offload returned early (resume, retry, or re-verify)
     if [ $offload_exit_code -eq 0 ]; then
-        # Check the result message to determine if it was a special operation
-        if echo "$offload_result" | grep -q "Resume complete\|Retry complete\|Re-verification complete\|Offload cancelled"; then
-            log_message "Offload operation completed: $offload_result"
-            echo "$offload_result"
-            return 0
-        fi
+        # Since we're not capturing output, we can't check the result message
+        # The offload function will handle its own completion messages
+        log_message "Offload operation completed successfully"
+        return 0
     elif [ $offload_exit_code -ne 0 ]; then
         handle_error "Offload operation failed"
     fi

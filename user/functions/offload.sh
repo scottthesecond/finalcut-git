@@ -3,56 +3,6 @@
 # Offload script for SD card footage
 # Usage: offload <input_path> <output_path> <project_shortname> <source_name> <type>
 
-# Function to validate input parameters
-validate_offload_params() {
-    local input_path="$1"
-    local output_path="$2"
-    local project_shortname="$3"
-    local source_name="$4"
-    local type="$5"
-    
-    # Check if all parameters are provided
-    if [ -z "$input_path" ] || [ -z "$output_path" ] || [ -z "$project_shortname" ] || [ -z "$source_name" ] || [ -z "$type" ]; then
-        handle_error "Usage: offload <input_path> <output_path> <project_shortname> <source_name> <type>"
-    fi
-    
-    # Validate input path exists
-    if [ ! -d "$input_path" ]; then
-        handle_error "Input path does not exist: $input_path"
-    fi
-    
-    # Validate type
-    case "$type" in
-        video|v|audio|a|photo|p|maintain|m)
-            ;;
-        *)
-            handle_error "Invalid type. Must be: video/v, audio/a, photo/p, maintain/m"
-            ;;
-    esac
-    
-    # Create output directory if it doesn't exist
-    if [ ! -d "$output_path" ]; then
-        log_message "Creating output directory: $output_path"
-        show_details "Creating output directory..."
-        mkdir -p "$output_path" || handle_error "Failed to create output directory: $output_path"
-        show_details "Output directory created successfully"
-    fi
-    
-    log_message "Parameters validated successfully"
-}
-
-# Function to get type prefix
-get_type_prefix() {
-    local type="$1"
-    case "$type" in
-        video|v) echo "v" ;;
-        audio|a) echo "a" ;;
-        photo|p) echo "p" ;;
-        maintain|m) echo "m" ;;
-        *) echo "v" ;; # Default to video
-    esac
-}
-
 # Function to check if a file or folder is AVCHD (case-insensitive)
 is_avchd() {
     local path="$1"
@@ -526,20 +476,19 @@ offload() {
     log_message "Type: $type"
     log_message "Counter: $counter"
     
-    # Show initial progress and details
+    # Debug logging to check progressbar variable
+    if [ "$DEBUG_MODE" = true ]; then
+        echo "DEBUG: offload function - progressbar='$progressbar', DEBUG_MODE='$DEBUG_MODE'" >&2
+    fi
+    
     show_progress 5
-    show_details_on
+    # show_details_on
     show_details "Starting offload process..."
     show_details "Input: $(basename "$input_path")"
     show_details "Output: $(basename "$output_path")"
     show_details "Project: $project_shortname"
     show_details "Type: $type"
     show_details "Counter: $counter"
-    
-    # Debug logging to check progressbar variable
-    if [ "$DEBUG_MODE" = true ]; then
-        echo "DEBUG: offload function - progressbar='$progressbar', DEBUG_MODE='$DEBUG_MODE'" >&2
-    fi
     
     # Validate parameters
     validate_offload_params "$input_path" "$output_path" "$project_shortname" "$source_name" "$type"
