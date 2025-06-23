@@ -52,7 +52,7 @@ should_skip_file() {
     # Audio type skips
     if [[ "$type" =~ ^(audio|a)$ ]]; then
         case "$extension" in
-            sys|zst|dat|db|url)
+            sys|zst|dat|db|url|bk|scr|thm|gis|log)
                 reason="Audio skip: $extension file"
                 echo "$reason"
                 return 0
