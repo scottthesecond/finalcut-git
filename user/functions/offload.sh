@@ -20,6 +20,42 @@ should_skip_file() {
     local type="$2"
     local reason=""
     local extension=$(echo "${file_path##*.}" | tr '[:upper:]' '[:lower:]')
+    local filename=$(basename "$file_path")
+    
+    # Skip .fseventsd folders for all types
+    if [[ "$filename" == ".fseventsd" ]]; then
+        reason="Skip .fseventsd folder"
+        echo "$reason"
+        return 0
+    fi
+    
+    # Skip fseventsd-uuid files for all types
+    if [[ "$filename" == "fseventsd-uuid" ]]; then
+        reason="Skip fseventsd-uuid file"
+        echo "$reason"
+        return 0
+    fi
+    
+    # Skip .ignore files for all types
+    if [[ "$filename" == ".ignore" ]]; then
+        reason="Skip .ignore file"
+        echo "$reason"
+        return 0
+    fi
+    
+    # Skip .offload files for all types
+    if [[ "$filename" == ".offload" ]]; then
+        reason="Skip .offload file"
+        echo "$reason"
+        return 0
+    fi
+    
+    # Skip .hedge-enabled files for all types
+    if [[ "$filename" == ".hedge-enabled" ]]; then
+        reason="Skip .hedge-enabled file"
+        echo "$reason"
+        return 0
+    fi
     
     # AVCHD skip if <2MB
     if is_avchd "$file_path"; then
@@ -44,7 +80,7 @@ should_skip_file() {
     # Video type skips
     if [[ "$type" =~ ^(video|v)$ ]]; then
         case "$extension" in
-            thumbs|xml|ctg|dat|cpc|cpg|b00|d00|scr|thm|log|jpg)
+            thumbs|xml|ctg|dat|cpc|cpg|b00|d00|scr|thm|log|jpg|tbl|dat)
                 reason="Video skip: $extension file"
                 echo "$reason"
                 return 0
