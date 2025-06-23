@@ -12,9 +12,20 @@ DEBUG_MODE=false
 launch_progress_app() {
     local operation="$1"
     local repo_name="$2"
-    local commit_message="$3"
+    local additional_param="$3"
     
-    log_message "launch_progress_app called with: operation='$operation', repo_name='$repo_name', commit_message='$commit_message'"
+    # Log with operation-specific context
+    case "$operation" in
+        "offload")
+            log_message "launch_progress_app called with: operation='$operation', input_path='$repo_name', source_name='$additional_param'"
+            ;;
+        "checkin"|"checkout")
+            log_message "launch_progress_app called with: operation='$operation', repo_name='$repo_name', commit_message='$additional_param'"
+            ;;
+        *)
+            log_message "launch_progress_app called with: operation='$operation', repo_name='$repo_name', additional_param='$additional_param'"
+            ;;
+    esac
     
     # Get the path to the bundled progress bar app
     # SCRIPT_DIR points to the Resources folder in the bundled app
@@ -26,14 +37,14 @@ launch_progress_app() {
     # Check if the app exists
     if [ -d "$progress_app_path" ]; then
         log_message "Progress app found at bundled location"
-        log_message "Attempting to launch: open '$progress_app_path' --args '$operation' '$repo_name' '$commit_message'"
-        open "$progress_app_path" --args "$operation" "$repo_name" "$commit_message"
+        log_message "Attempting to launch: open -n '$progress_app_path' --args '$operation' '$repo_name' '$additional_param'"
+        open -n "$progress_app_path" --args "$operation" "$repo_name" "$additional_param"
         log_message "Launch command completed"
     else
         log_message "Progress app not found at bundled location, trying Applications folder"
         # Fallback: try to find it in Applications
-        log_message "Attempting to launch: open -a 'UNFlab Progress' --args '$operation' '$repo_name' '$commit_message'"
-        open -a "UNFlab Progress" --args "$operation" "$repo_name" "$commit_message"
+        log_message "Attempting to launch: open -n -a 'UNFlab Progress' --args '$operation' '$repo_name' '$additional_param'"
+        open -n -a "UNFlab Progress" --args "$operation" "$repo_name" "$additional_param"
         log_message "Fallback launch command completed"
     fi
 }

@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.0.0a2"
+VERSION="3.0.0a3"
 NAME="UNFlab"
 
 # Default values
@@ -180,7 +180,6 @@ if [ "$build_with_platypus" = true ]; then
     
     /usr/local/bin/platypus \
         --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
-        --background \
         --name "$progress_app_name"\
         --app-version "$VERSION"\
         --author "Unnamed Media"\
@@ -197,7 +196,6 @@ if [ "$build_with_platypus" = true ]; then
     
     /usr/local/bin/platypus \
         --app-icon "$SCRIPT_DIR/app/AppIcon.icns"\
-        --background \
         --name "$droplet_app_name"\
         --app-version "$VERSION"\
         --author "Unnamed Media"\
