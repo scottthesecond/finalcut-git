@@ -294,10 +294,15 @@ checkout() {
     show_progress 100
     show_details "Checkout complete! Opening project..."
 
-    hide_dialog
-    create_settings_plist
+    # Clean exit for progress bar mode, hide dialog for other modes
+    if [ "$progressbar" = true ]; then
+        clean_exit 0
+    else
+        hide_dialog
+        display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
+    fi
 
-    display_notification "Checked out $selected_repo." "The project is ready to work on." "When you're done, launch UNFlab and select 'checkin', then $selected_repo"
+    create_settings_plist
 
     open_fcp_or_directory
     return $RC_SUCCESS

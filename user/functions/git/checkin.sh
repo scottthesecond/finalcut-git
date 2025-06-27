@@ -70,8 +70,14 @@ checkin() {
     show_progress 100
     show_details "Checkin complete!"
 
-    hide_dialog
-    display_notification "Uploaded changes to $selected_repo." "$selected_repo has been successfully checked in."
+    # Clean exit for progress bar mode, hide dialog for other modes
+    if [ "$progressbar" = true ]; then
+        clean_exit 0
+    else
+        hide_dialog
+        display_notification "Uploaded changes to $selected_repo." "$selected_repo has been successfully checked in."
+    fi
+    
     log_message "(END CHECKIN)"
     return $RC_SUCCESS
 }
