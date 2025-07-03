@@ -94,7 +94,7 @@ generate_filename_with_original() {
         # Sanitize original filename for use in parentheses (remove special chars, limit length)
         local sanitized_original=$(echo "$original_filename" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g' | cut -c1-20)
         if [ -n "$sanitized_original" ]; then
-            echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).(${sanitized_original}).${extension}"
+            echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter)(${sanitized_original}).${extension}"
         else
             echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).${extension}"
         fi

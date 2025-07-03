@@ -145,7 +145,7 @@ if [ "$build_with_platypus" = true ]; then
 
     # Check if any of the UNFlab apps are running and quit them
     progress_app_name="$NAME Progress"
-    droplet_app_name="$NAME Offload Droplet"
+    droplet_app_name="$NAME Offload"
     
     # Quit main UNFlab app
     if pgrep -f "$NAME.app" > /dev/null; then
