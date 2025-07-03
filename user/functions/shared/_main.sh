@@ -34,6 +34,15 @@ launch_progress_app() {
     log_message "Progress app path: $progress_app_path"
     log_message "SCRIPT_DIR: $SCRIPT_DIR"
     
+    # Check if we're running from a nested droplet app and need to look in the parent app
+    if [[ "$SCRIPT_DIR" == *"UNFlab Offload Droplet.app/Contents/Resources"* ]]; then
+        log_message "Detected droplet app, looking for progress app in parent UNFlab app"
+        # Navigate up to the main UNFlab app's Resources folder
+        local parent_resources_dir="${SCRIPT_DIR%/UNFlab Offload Droplet.app/Contents/Resources*}/Contents/Resources"
+        progress_app_path="${parent_resources_dir}/UNFlab Progress.app"
+        log_message "Adjusted progress app path: $progress_app_path"
+    fi
+    
     # Check if the app exists
     if [ -d "$progress_app_path" ]; then
         log_message "Progress app found at bundled location"

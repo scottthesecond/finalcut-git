@@ -164,8 +164,8 @@ scan_input_directory() {
             dest_path="$output_path/$new_filename"
         fi
         
-        # Add to offload file
-        echo "$file_path|$dest_path|$new_filename|queued" >> "$offload_file"
+        # Add to offload file with unified format: source_file|dest_file|new_filename|status|source_size|dest_size|source_hash|dest_hash
+        echo "$file_path|$dest_path|$new_filename|queued|0|0||" >> "$offload_file"
         
         log_message "Queued: $file_path -> $dest_path"
         ((file_counter++))
@@ -183,7 +183,7 @@ copy_files() {
     local total_files=$(wc -l < "$offload_file")
     local current_file=0
     
-    # Create destination offload file for filename mappings
+    # Create destination offload file (same format as source)
     local dest_offload_file="$output_path/.offload"
     > "$dest_offload_file"
     
@@ -191,7 +191,7 @@ copy_files() {
     show_details "Starting file copy process..."
     show_details "Copying $total_files files..."
     
-    while IFS='|' read -r source_path dest_path new_filename status; do
+    while IFS='|' read -r source_path dest_path new_filename status source_size dest_size source_hash dest_hash; do
         ((current_file++))
         
         if [ "$status" = "queued" ] || [ "$status" = "unverified" ]; then
@@ -207,8 +207,8 @@ copy_files() {
                 # Update status to unverified
                 sed -i '' "${current_file}s/$status$/unverified/" "$offload_file"
                 
-                # Add mapping to destination offload file
-                echo "$new_filename|$(basename "$source_path")" >> "$dest_offload_file"
+                # Add same entry to destination offload file
+                echo "$source_path|$dest_path|$new_filename|unverified|$source_size|$dest_size|$source_hash|$dest_hash" >> "$dest_offload_file"
                 
                 log_message "Successfully copied: $new_filename"
                 show_details "✓ Copied: $new_filename"
@@ -241,7 +241,7 @@ check_offload_status() {
         return
     fi
     
-    # Count files by status
+    # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
     while IFS='|' read -r source_path dest_path new_filename status; do
         ((total_files++))
         case "$status" in
@@ -284,7 +284,7 @@ get_offload_stats() {
         return
     fi
     
-    # Count files by status
+    # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
     while IFS='|' read -r source_path dest_path new_filename status; do
         ((total_files++))
         case "$status" in

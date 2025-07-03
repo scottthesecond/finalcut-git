@@ -297,12 +297,18 @@ run_offload_with_progress() {
     offload "$input_path" "$full_dest_path" "$project_shortname" "$source_name" "$type" "$counter"
     local offload_exit_code=$?
     
-    # Check if offload returned early (resume, retry, or re-verify)
+    # If offload returned early (resume, retry, re-verify, or cancel), do not run verification
     if [ $offload_exit_code -eq 0 ]; then
-        # Since we're not capturing output, we can't check the result message
-        # The offload function will handle its own completion messages
-        log_message "Offload operation completed successfully"
-        return 0
+        # Check if the offload was a resume, retry, or re-verify by inspecting the output message
+        # (offload returns 0 for both new and resumed/retried offloads, so we need a better signal)
+        # For now, assume that if the .offload file existed before, offload handled verification or resume
+        # Otherwise, always run verification after a new offload
+        local offload_file="$input_path/.offload"
+        if [ -f "$offload_file.backup" ]; then
+            # There was an existing offload, so we returned early
+            log_message "Offload operation completed (resume/retry/re-verify/cancel), skipping verification step."
+            return 0
+        fi
     elif [ $offload_exit_code -ne 0 ]; then
         handle_error "Offload operation failed"
     fi
