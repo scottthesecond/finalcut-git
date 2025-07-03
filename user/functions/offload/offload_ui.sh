@@ -243,7 +243,7 @@ launch_offload_droplet() {
     fi
     
     # Get the path to the bundled droplet app
-    local droplet_app_path="${SCRIPT_DIR}/UNFlab Offload Droplet.app"
+    local droplet_app_path="${SCRIPT_DIR}/UNFlab Offload.app"
     
     log_message "Launching offload droplet: $droplet_app_path"
     
@@ -255,7 +255,7 @@ launch_offload_droplet() {
     else
         log_message "Droplet app not found at bundled location, trying Applications folder"
         # Fallback: try to find it in Applications
-        open -a "UNFlab Offload Droplet"
+        open -a "UNFlab Offload"
         log_message "Fallback droplet launch command completed"
     fi
 }
