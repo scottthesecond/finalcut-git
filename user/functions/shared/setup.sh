@@ -20,7 +20,8 @@ setup() {
 	# Write the server address and port to the .env file
 	echo "SERVER_ADDRESS=$SERVER_ADDRESS" > "$CONFIG_FILE"
 	echo "SERVER_PORT=$SERVER_PORT" >> "$CONFIG_FILE"
-	echo "SERVER_PATH=$SERVER_PATH" >> "$CONFIG_FILE"
+	# Escape the tilde to prevent local expansion when sourcing
+	echo "SERVER_PATH='$SERVER_PATH'" >> "$CONFIG_FILE"
 
 	# 1) Check if Git is installed
 	if command_exists git; then
