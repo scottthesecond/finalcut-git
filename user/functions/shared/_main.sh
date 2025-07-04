@@ -226,6 +226,13 @@ while [[ "$1" != "" ]]; do
       parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
       
+    # Open operations
+    "Open "*)
+      script="open"
+      parameter=$(echo "$1" | sed 's/^Open //' | tr -d '"')
+      log_message "Extracted open parameter: '$parameter'"
+      ;;
+      
     # New Project creation from submenu
     "New Project...")
       script="checkout"
@@ -340,7 +347,9 @@ if [ -n "$script" ]; then
       if ! repo_exists "$parameter" "$CHECKEDOUT_FOLDER"; then
         handle_error "Project directory not found: $parameter"
       else
-        open "$CHECKEDOUT_FOLDER/$parameter" || handle_error "Failed to open project: $parameter"
+        # Set selected_repo for the open_fcp_or_directory function
+        selected_repo="$parameter"
+        open_fcp_or_directory
       fi
       ;;
     "offload")
@@ -457,9 +466,9 @@ display_navbar_menu() {
             
             # Create submenu for this project
             if [ -n "$last_checkpoint" ]; then
-                echo "SUBMENU|$repo_name|DISABLED|Last Autosave: $last_checkpoint|Check In \"$repo_name\"|Quick Save \"$repo_name\""
+                echo "SUBMENU|$repo_name|DISABLED|Last Autosave: $last_checkpoint|Open \"$repo_name\"|Check In \"$repo_name\""
             else
-                echo "SUBMENU|$repo_name|Check In \"$repo_name\"|Quick Save \"$repo_name\""
+                echo "SUBMENU|$repo_name|Open \"$repo_name\"|Check In \"$repo_name\""
             fi
         done
     fi
