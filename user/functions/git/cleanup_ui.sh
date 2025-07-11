@@ -11,9 +11,36 @@ display_cleanup_submenu() {
         submenu_items="DISABLED|Found ${#removable_repos[@]} project(s) that can be safely removed"
         submenu_items="$submenu_items|----"
         
-        # Add each removable repository
+        # Add each removable repository with days since last commit and size
         for repo_name in "${removable_repos[@]}"; do
-            submenu_items="$submenu_items|Remove \"$repo_name\" from cache"
+            local repo_path="$CHECKEDIN_FOLDER/$repo_name"
+            local days_since_commit="unknown"
+            local size_str="unknown"
+
+            # Days since last commit
+            if [ -d "$repo_path" ]; then
+                if cd "$repo_path"; then
+                    local last_commit_time=$(git log -1 --format=%ct 2>/dev/null)
+                    if [ -n "$last_commit_time" ]; then
+                        local now=$(date +%s)
+                        local days_ago=$(( (now - last_commit_time) / 86400 ))
+                        days_since_commit="$days_ago"
+                    fi
+                fi
+                # Repo size in KB
+                local size_kb=$(du -sk . | awk '{print $1}')
+                if [ -n "$size_kb" ]; then
+                    if [ "$size_kb" -ge 1048576 ]; then
+                        # 1GB or more
+                        local size_gb=$(echo "scale=1; $size_kb/1048576" | bc)
+                        size_str="$size_gb GB"
+                    else
+                        local size_mb=$(echo "scale=1; $size_kb/1024" | bc)
+                        size_str="$size_mb MB"
+                    fi
+                fi
+            fi
+            submenu_items="$submenu_items|Remove \"$repo_name\" ($days_since_commit days; $size_str) from cache"
         done
         
         # Output the submenu in Platypus format
@@ -27,9 +54,9 @@ handle_cleanup_menu() {
     local menu_item="$1"
     
     case "$menu_item" in
-        Remove\ \"*\"\ from\ cache)
-            # Extract repo name using sed
-            local repo_name=$(echo "$menu_item" | sed -n 's/^Remove "\(.*\)" from cache$/\1/p')
+        Remove\ "*"*from\ cache)
+            # Extract repo name using sed (up to first closing quote)
+            local repo_name=$(echo "$menu_item" | sed -n 's/^Remove "\([^"]*\)".*/\1/p')
             prompt_remove_repository "$repo_name"
             ;;
         *)

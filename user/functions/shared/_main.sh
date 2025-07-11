@@ -174,6 +174,13 @@ while [[ "$1" != "" ]]; do
       script="checkpointall"
       ;;
       
+    Remove\ \"*from\ cache)
+      repo_name=$(echo "$1" | sed -n 's/^Remove "\([^"]*\)".*/\1/p')
+      script="cleanup_ui"
+      parameter="remove|$repo_name"
+      ;;
+
+
     # Check in operations (from submenus)
     "Check In "*)
       script="checkin"
@@ -264,13 +271,7 @@ while [[ "$1" != "" ]]; do
       script="offload_ui"
       parameter="verify_external"
       ;;
-      
-    # Cleanup menu operations
-    "Remove "*" from cache")
-      script="cleanup_ui"
-      parameter="remove|$(echo "$1" | sed 's/Remove "//' | sed 's/" from cache//')"
-      ;;
-      
+            
     # Default case for direct script/parameter pairs and quoted project names
     *)
       if [ -z "$script" ]; then
