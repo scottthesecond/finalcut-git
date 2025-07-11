@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  git-server:
+    build: .
+    container_name: finalcut-git-server
+    hostname: git-server
+    restart: unless-stopped
+    
+    # Expose SSH port for Git operations
+    ports:
+      - "2222:22"
+    
+    # Mount the repositories directory to a named volume
+    # This can be easily backed up or mounted to a network share
+    volumes:
+      - git_repositories:/home/git/repositories
+      - ./ssh_keys:/home/git/.ssh:ro
+    
+    # Environment variables
+    environment:
+      - GIT_USER=git
+      - REPO_PATH=/home/git/repositories
+
+volumes:
+  git_repositories:
+    driver: local 
