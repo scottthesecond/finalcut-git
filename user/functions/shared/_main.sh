@@ -265,6 +265,12 @@ while [[ "$1" != "" ]]; do
       parameter="verify_external"
       ;;
       
+    # Cleanup menu operations
+    "Remove "*" from cache")
+      script="cleanup_ui"
+      parameter="remove|$(echo "$1" | sed 's/Remove "//' | sed 's/" from cache//')"
+      ;;
+      
     # Default case for direct script/parameter pairs and quoted project names
     *)
       if [ -z "$script" ]; then
@@ -278,8 +284,9 @@ while [[ "$1" != "" ]]; do
   shift
 done
 
-# Enable auto checkpoint only in statusbar mode (after argument parsing)
+# Enable auto checkpoint and cleanup worker only in statusbar mode (after argument parsing)
 enable_auto_checkpoint
+enable_cleanup_worker
 
 # Log the final script and parameter values
 log_message "Script: $script"
@@ -335,6 +342,9 @@ if [ -n "$script" ]; then
     "checkpointall") 
       checkpoint_all || handle_error "Checkpoint all operation failed"
       ;;
+    "cleanup_check")
+      cleanup_check || handle_error "Cleanup check operation failed"
+      ;;
     "setup"|"Setup")
       setup "$parameter" || handle_error "Setup operation failed"
       ;;
@@ -371,7 +381,15 @@ if [ -n "$script" ]; then
               log_message "Using card name as source name: $source_name"
             fi
             
-            run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
+            # For droplet calls to progress app, the parameter might be "input_path|card_name"
+            # Check if we have exactly 2 parts and the second looks like a card name (not a path)
+            local parts=($(echo "$parameter" | tr '|' '\n'))
+            if [ ${#parts[@]} -eq 2 ] && [[ ! "${parts[1]}" =~ ^/ ]]; then
+              log_message "Detected droplet format: input_path='${parts[0]}', card_name='${parts[1]}'"
+              run_offload_with_progress "${parts[0]}" "${parts[1]}" || handle_error "Offload operation failed"
+            else
+              run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
+            fi
           else
             handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
           fi
@@ -452,6 +470,25 @@ if [ -n "$script" ]; then
         handle_error "Offload UI requires parameters: action|type"
       fi
       ;;
+    "cleanup_ui")
+      log_message "preparing for cleanup UI script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse cleanup UI parameters
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r action repo_name <<< "$parameter"
+        case $action in
+          "remove")
+            prompt_remove_repository "$repo_name" || handle_error "Failed to remove repository"
+            ;;
+          *)
+            handle_error "Unknown cleanup UI action: $action"
+            ;;
+        esac
+      else
+        handle_error "Cleanup UI requires parameters: action|repo_name"
+      fi
+      ;;
     *)
       handle_error "Unknown script: $script"
       ;;
@@ -514,6 +551,11 @@ display_navbar_menu() {
     echo "----"
     echo "DISABLED|$APP_NAME Version $VERSION"
     echo "Setup"
+    
+    # Add cleanup submenu at the top (if there are removable repositories)
+    if has_removable_repos; then
+        display_cleanup_submenu
+    fi
     
     # Add offload submenu at the bottom
     display_offload_submenu

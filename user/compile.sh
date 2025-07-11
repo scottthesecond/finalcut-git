@@ -76,6 +76,8 @@ scripts=(
     "$FUNCTIONS/git/checkpoint.sh"
     "$FUNCTIONS/git/checkpoint_all.sh"
     "$FUNCTIONS/git/checkout.sh"
+    "$FUNCTIONS/git/operations/cleanup.sh"
+    "$FUNCTIONS/git/cleanup_ui.sh"
     "$FUNCTIONS/shared/config.sh"
     "$FUNCTIONS/shared/dialogs.sh"
     "$FUNCTIONS/shared/fcp.sh"
