@@ -196,6 +196,7 @@ display_offload_submenu() {
     
     submenu_items="$submenu_items|----"
     submenu_items="$submenu_items|Offload"
+    submenu_items="$submenu_items|Verify External Card"
     
     # Output the submenu in Platypus format
     echo "SUBMENU|Offload|$submenu_items"
@@ -227,6 +228,9 @@ handle_offload_menu() {
         "Offload")
             launch_offload_droplet
             ;;
+        "Verify External Card")
+            launch_external_verification
+            ;;
         *)
             echo "Unknown offload menu item: $menu_item"
             ;;
@@ -257,6 +261,28 @@ launch_offload_droplet() {
         # Fallback: try to find it in Applications
         open -a "UNFlab Offload"
         log_message "Fallback droplet launch command completed"
+    fi
+}
+
+# Function to launch external verification
+launch_external_verification() {
+    local dest=$(get_offload_config "DESTINATION")
+    
+    if [ -z "$dest" ]; then
+        handle_error "Offload destination not set. Please set a destination first."
+    fi
+    
+    # Use device selection with a custom prompt
+    local prompt_text="Choose an SD card to verify against $dest"
+    local source_path=$(select_connected_device "$prompt_text")
+    
+    if [ -n "$source_path" ]; then
+        log_message "Starting external verification: $source_path -> $dest"
+        
+        # Always launch progress app for verification (provides progress feedback and cancel option)
+        launch_progress_app "verify_external" "$source_path" "$dest"
+    else
+        log_message "No source selected for external verification"
     fi
 }
 
@@ -319,4 +345,25 @@ run_offload_with_progress() {
     
     log_message "Offload and verification complete"
     echo "Offload and verification complete!"
+}
+
+# Function to run external verification with progress bar
+run_verify_external_with_progress() {
+    local source_path="$1"
+    local destination_path="$2"
+    
+    log_message "Running external verification in progress mode"
+    log_message "Source: $source_path"
+    log_message "Destination: $destination_path"
+    
+    # Run external verification with progress feedback
+    verify_external_source "$source_path" "$destination_path"
+    local verify_exit_code=$?
+    
+    if [ $verify_exit_code -eq 0 ]; then
+        log_message "External verification completed successfully"
+        echo "External verification completed successfully!"
+    else
+        handle_error "External verification failed"
+    fi
 } 

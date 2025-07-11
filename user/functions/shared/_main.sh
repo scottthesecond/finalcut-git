@@ -152,20 +152,12 @@ while [[ "$1" != "" ]]; do
       ;;
       
     # Progress bar operations (when launched from status menu)
-    checkout|checkin|checkpoint|offload)
+    checkout|checkin|checkpoint|offload|verify_external)
       if [ "$progressbar" = true ]; then
         script="$1"
         shift
-        if [ -n "$1" ]; then
-          parameter="$1"
-          # For offload, also capture the card name as the third argument
-          if [ "$script" = "offload" ] && [ -n "$2" ]; then
-            shift
-            # Store the card name in a way that can be accessed later
-            CARD_NAME="$1"
-            log_message "Captured card name for offload: $CARD_NAME"
-          fi
-        fi
+        # Always join all remaining args as pipe-separated for parameter
+        parameter="$(printf "%s|" "$@" | sed 's/|$//')"
         break
       fi
       ;;
@@ -267,6 +259,10 @@ while [[ "$1" != "" ]]; do
     "Offload")
       script="offload_ui"
       parameter="launch_droplet"
+      ;;
+    "Verify External Card")
+      script="offload_ui"
+      parameter="verify_external"
       ;;
       
     # Default case for direct script/parameter pairs and quoted project names
@@ -407,6 +403,24 @@ if [ -n "$script" ]; then
         handle_error "Verify requires parameters: source_path|destination_path"
       fi
       ;;
+    "verify_external")
+      log_message "preparing for external verify script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse external verify parameters (source_path|destination_path)
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r source_path destination_path <<< "$parameter"
+        
+        if [ "$progressbar" = true ]; then
+          log_message "Running external verify in progressbar mode"
+          run_verify_external_with_progress "$source_path" "$destination_path" || handle_error "External verify operation failed"
+        else
+          verify_external_source "$source_path" "$destination_path" || handle_error "External verify operation failed"
+        fi
+      else
+        handle_error "External verify requires parameters: source_path|destination_path"
+      fi
+      ;;
     "offload_ui")
       log_message "preparing for offload UI script"
       log_message "Parameter value: '$parameter'"
@@ -426,6 +440,9 @@ if [ -n "$script" ]; then
             ;;
           "launch_droplet")
             launch_offload_droplet || handle_error "Failed to launch droplet"
+            ;;
+          "verify_external")
+            launch_external_verification || handle_error "Failed to launch external verification"
             ;;
           *)
             handle_error "Unknown offload UI action: $action"
