@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.0.0a8"
+VERSION="3.0.0b1"
 NAME="UNFlab"
 
 # Default values

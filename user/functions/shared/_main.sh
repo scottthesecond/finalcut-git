@@ -152,11 +152,20 @@ while [[ "$1" != "" ]]; do
       ;;
       
     # Progress bar operations (when launched from status menu)
-    checkout|checkin|checkpoint|offload|verify_external)
+    checkout|checkin|checkpoint)
       if [ "$progressbar" = true ]; then
         script="$1"
         shift
-        # Always join all remaining args as pipe-separated for parameter
+        # Single parameter operations
+        parameter="$1"
+        break
+      fi
+      ;;
+    offload|verify_external)
+      if [ "$progressbar" = true ]; then
+        script="$1"
+        shift
+        # Multiple parameter operations - join with pipes
         parameter="$(printf "%s|" "$@" | sed 's/|$//')"
         break
       fi
