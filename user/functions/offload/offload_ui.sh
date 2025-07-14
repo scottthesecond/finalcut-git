@@ -307,7 +307,9 @@ run_offload_with_progress() {
     
     # Create destination folder with the new naming scheme
     local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
-    local full_dest_path="$base_dest/$dest_folder"
+    # Ensure base_dest doesn't end with a slash to avoid double slashes
+    local clean_base_dest=$(echo "$base_dest" | sed 's|/$||')
+    local full_dest_path="$clean_base_dest/$dest_folder"
     
     log_message "Running offload in progress mode"
     log_message "Input: $input_path"

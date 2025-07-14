@@ -116,7 +116,7 @@ scan_input_directory() {
     local ignore_file_src="$input_path/.ignore"
     local ignore_file_dest="$output_path/.ignore"
     > "$ignore_file_src"
-    > "$ignore_file_dest"
+    # Don't create destination .ignore file yet - destination directory doesn't exist
     
     log_message "Scanning input directory: $input_path"
     show_details "Scanning input directory for files..."
@@ -141,7 +141,10 @@ scan_input_directory() {
             ((skipped_count++))
             log_message "Skipping $file_path: $skip_reason"
             echo "$file_path|$skip_reason" >> "$ignore_file_src"
-            echo "$file_path|$skip_reason" >> "$ignore_file_dest"
+            # Only write to destination .ignore if destination directory exists
+            if [ -d "$(dirname "$ignore_file_dest")" ]; then
+                echo "$file_path|$skip_reason" >> "$ignore_file_dest"
+            fi
             continue
         fi
         
@@ -235,14 +238,18 @@ check_offload_status() {
     local completed_files=0
     local failed_files=0
     local queued_files=0
-    
+
     if [ ! -f "$offload_file" ]; then
         echo "none"
         return
     fi
-    
+
     # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
-    while IFS='|' read -r source_path dest_path new_filename status; do
+    while IFS='|' read -r source_path dest_path new_filename status rest; do
+        # Ignore empty lines
+        if [ -z "$source_path" ] && [ -z "$dest_path" ] && [ -z "$new_filename" ] && [ -z "$status" ]; then
+            continue
+        fi
         ((total_files++))
         case "$status" in
             "verified")
@@ -256,13 +263,15 @@ check_offload_status() {
                 ;;
         esac
     done < "$offload_file"
-    
+
+    log_message "DEBUG: check_offload_status: total_files=$total_files, completed_files=$completed_files, failed_files=$failed_files, queued_files=$queued_files"
+
     # Determine overall status
     if [ "$total_files" -eq 0 ]; then
         echo "none"
     elif [ "$queued_files" -gt 0 ]; then
         echo "incomplete"
-    elif [ "$failed_files" -gt 0 ]; then
+    elif [ "$failed_files" -gt 0 ] && [ "$queued_files" -eq 0 ]; then
         echo "failed"
     elif [ "$completed_files" -eq "$total_files" ]; then
         echo "complete"
@@ -278,14 +287,18 @@ get_offload_stats() {
     local completed_files=0
     local failed_files=0
     local queued_files=0
-    
+
     if [ ! -f "$offload_file" ]; then
         echo "0|0|0|0"
         return
     fi
-    
+
     # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
-    while IFS='|' read -r source_path dest_path new_filename status; do
+    while IFS='|' read -r source_path dest_path new_filename status rest; do
+        # Ignore empty lines
+        if [ -z "$source_path" ] && [ -z "$dest_path" ] && [ -z "$new_filename" ] && [ -z "$status" ]; then
+            continue
+        fi
         ((total_files++))
         case "$status" in
             "verified")
@@ -299,7 +312,7 @@ get_offload_stats() {
                 ;;
         esac
     done < "$offload_file"
-    
+
     echo "$total_files|$completed_files|$failed_files|$queued_files"
 }
 
@@ -312,6 +325,8 @@ prompt_offload_action() {
     
     IFS='|' read -r total_files completed_files failed_files queued_files <<< "$stats"
     
+    log_message "DEBUG: prompt_offload_action: total_files=$total_files, completed_files=$completed_files, failed_files=$failed_files, queued_files=$queued_files, status=$status"
+
     local message=""
     local buttons=""
     
@@ -334,11 +349,36 @@ prompt_offload_action() {
             ;;
     esac
     
-    local choice=$(osascript <<EOF
-display dialog "$message" buttons {$buttons} default button 1 with title "Offload Status Detected"
+    # Convert pipe-separated button names to properly quoted AppleScript format
+    local quoted_buttons=""
+    IFS='|' read -ra button_array <<< "$buttons"
+    for button in "${button_array[@]}"; do
+        if [ -n "$quoted_buttons" ]; then
+            quoted_buttons="$quoted_buttons, \"$button\""
+        else
+            quoted_buttons="\"$button\""
+        fi
+    done
+    
+    # Run osascript and capture both output and error
+    local result=$(osascript <<EOF
+display dialog "$message" buttons {$quoted_buttons} default button 1 with title "Offload Status Detected"
 button returned of result
 EOF
-)
+ 2>&1)
+    local osascript_status=$?
+    log_message "DEBUG: osascript raw result: $result, exit status: $osascript_status"
+    
+    # Check if osascript failed (user canceled or other error)
+    if [ $osascript_status -ne 0 ]; then
+        log_message "Error: Failed to display offload action dialog. Status: $osascript_status, Error: $result"
+        echo "Cancel"
+        return
+    fi
+    
+    # Parse the result to get just the button name
+    local choice=$(echo "$result" | sed -n 's/.*button returned:\(.*\)/\1/p' | tr -d ', ')
+    log_message "DEBUG: parsed dialog choice: '$choice'"
     
     echo "$choice"
 }
@@ -415,11 +455,11 @@ retry_failed_offload() {
     local type="$5"
     local counter="$6"
     local offload_file="$7"
-    
+
     log_message "Retrying failed offload from: $offload_file"
     show_details "Retrying failed offload..."
     show_progress 5
-    
+
     # Determine the correct destination path from the offload file
     local actual_output_path=""
     if [ -n "$output_path" ]; then
@@ -436,24 +476,27 @@ retry_failed_offload() {
             handle_error "Cannot determine destination path from .offload file"
         fi
     fi
-    
-    # Get statistics
+
+    # Get statistics BEFORE modifying the file
     local stats=$(get_offload_stats "$offload_file")
     IFS='|' read -r total_files completed_files failed_files queued_files <<< "$stats"
-    
     log_message "Retry stats - Total: $total_files, Completed: $completed_files, Failed: $failed_files"
     show_details "Retrying: $failed_files failed files"
-    
-    # Reset failed files to queued status
-    sed -i '' 's/failed$/queued/g' "$offload_file"
-    
+
+    # Only change 'failed' to 'queued', leave all other lines untouched
+    local tmpfile="${offload_file}.tmp"
+    awk -F'|' '{
+        if ($4 == "failed") $4 = "queued";
+        print $1 "|" $2 "|" $3 "|" $4 "|" $5 "|" $6 "|" $7 "|" $8
+    }' "$offload_file" > "$tmpfile" && mv "$tmpfile" "$offload_file"
+
     # Copy files (this will retry the failed ones)
     copy_files "$offload_file" "$actual_output_path"
-    
+
     # Display summary
     local final_stats=$(get_offload_stats "$offload_file")
     IFS='|' read -r final_total final_completed final_failed final_queued <<< "$final_stats"
-    
+
     show_progress 100
     show_details "Retry complete!"
     show_details "Total files: $final_total"
@@ -461,14 +504,14 @@ retry_failed_offload() {
     if [ "$final_failed" -gt 0 ]; then
         show_details "Failed: $final_failed"
     fi
-    
+
     log_message "Retry complete!"
     log_message "Total files: $final_total"
     log_message "Successfully copied: $final_completed"
     if [ "$final_failed" -gt 0 ]; then
         log_message "Failed: $final_failed"
     fi
-    
+
     echo "Retry complete! $final_completed files copied to $actual_output_path"
 }
 
@@ -547,8 +590,9 @@ offload() {
         
         # Check offload status
         local status=$(check_offload_status "$offload_file")
+        # Get stats BEFORE any file is cleared or overwritten
         local stats=$(get_offload_stats "$offload_file")
-        
+
         log_message "Offload status: $status"
         log_message "Offload stats: $stats"
         
@@ -591,8 +635,9 @@ offload() {
                     ;;
                 *)
                     log_message "Unknown action: $action"
-                    show_details "Unknown action, starting new offload..."
-                    # Continue with new offload process
+                    show_details "Unknown action, aborting offload."
+                    echo "Offload cancelled"
+                    return 0
                     ;;
             esac
         fi
