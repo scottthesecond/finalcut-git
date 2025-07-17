@@ -224,6 +224,14 @@ display_offload_submenu() {
     fi
     
     submenu_items="$submenu_items|----"
+    
+    # Queue status
+    local queue_count=$(get_queue_status)
+    if [ "$queue_count" -gt 0 ]; then
+        submenu_items="$submenu_items|DISABLED|Queue: $queue_count offload(s) waiting"
+        submenu_items="$submenu_items|Clear Queue"
+    fi
+    
     submenu_items="$submenu_items|Offload"
     submenu_items="$submenu_items|Verify External Card"
     
@@ -259,6 +267,10 @@ handle_offload_menu() {
             ;;
         "Verify External Card")
             launch_external_verification
+            ;;
+        "Clear Queue")
+            clear_offload_queue
+            echo "Queue cleared"
             ;;
         *)
             echo "Unknown offload menu item: $menu_item"
@@ -330,6 +342,26 @@ run_offload_with_progress() {
     local project_shortname=$(get_project_shortname)
     local source_name=$(sanitize_source_name "$provided_source_name" "$input_path")
     
+    # Check if an offload is already in progress
+    if check_offload_in_progress; then
+        # No offload in progress, we can proceed
+        log_message "No offload in progress, proceeding with offload"
+    else
+        # Offload is in progress, queue this one
+        log_message "Offload already in progress, adding to queue"
+        if queue_offload "$input_path" "$source_name"; then
+            return 0  # Successfully queued
+        else
+            handle_error "Failed to queue offload"
+        fi
+    fi
+    
+    # Create offload lock
+    if ! create_offload_lock; then
+        log_message "Failed to create offload lock, this should not happen"
+        return $RC_ERROR
+    fi
+    
     # Get and increment the counter
     local counter=$(increment_offload_counter)
     local type_prefix=$(get_type_prefix "$type")
@@ -365,6 +397,8 @@ run_offload_with_progress() {
         if [ -f "$offload_file.backup" ]; then
             # There was an existing offload, so we returned early
             log_message "Offload operation completed (resume/retry/re-verify/cancel), skipping verification step."
+            # Process queue after early exit
+            process_offload_queue
             return 0
         fi
     elif [ $offload_exit_code -ne 0 ]; then
@@ -377,6 +411,9 @@ run_offload_with_progress() {
     
     log_message "Offload and verification complete"
     echo "Offload and verification complete!"
+    
+    # Process queue after successful completion
+    process_offload_queue
 }
 
 # Function to run external verification with progress bar

@@ -84,6 +84,7 @@ scripts=(
     "$FUNCTIONS/shared/fcp.sh"
     "$FUNCTIONS/git/enable_auto_checkpoint.sh"
     "$FUNCTIONS/offload/offload_utils.sh"
+    "$FUNCTIONS/offload/offload_queue.sh"
     "$FUNCTIONS/offload/offload.sh"
     "$FUNCTIONS/offload/offload_ui.sh"
     "$FUNCTIONS/offload/verify.sh"
