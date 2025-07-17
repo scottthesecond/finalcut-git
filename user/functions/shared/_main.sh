@@ -401,12 +401,6 @@ if [ -n "$script" ]; then
       log_message "Parameter value: '$parameter'"
       log_message "Card name: '$CARD_NAME'"
       
-      # Check if offload functionality is enabled
-      local offload_enabled=$(get_offload_enabled)
-      if [ "$offload_enabled" != "true" ]; then
-        handle_error "Offload functionality is disabled. Please enable it in the configuration first."
-      fi
-      
       if [ "$progressbar" = true ]; then
         log_message "Running offload in progressbar mode"
         
@@ -486,12 +480,6 @@ if [ -n "$script" ]; then
     "offload_ui")
       log_message "preparing for offload UI script"
       log_message "Parameter value: '$parameter'"
-      
-      # Check if offload functionality is enabled
-      local offload_enabled=$(get_offload_enabled)
-      if [ "$offload_enabled" != "true" ]; then
-        handle_error "Offload functionality is disabled. Please enable it in the configuration first."
-      fi
       
       # Parse offload UI parameters
       if [ -n "$parameter" ]; then
