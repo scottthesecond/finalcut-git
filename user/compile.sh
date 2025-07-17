@@ -61,6 +61,7 @@ scripts=(
     "$FUNCTIONS/shared/vars.sh"
     "$FUNCTIONS/shared/logs.sh"
     "$FUNCTIONS/shared/setup.sh"
+    "$FUNCTIONS/shared/setup_ui.sh"
     "$FUNCTIONS/shared/select_repo.sh"
     "$FUNCTIONS/git/operations/checkConnectivity.sh"
     "$FUNCTIONS/git/operations/commitAndPush.sh"

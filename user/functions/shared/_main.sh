@@ -247,6 +247,28 @@ while [[ "$1" != "" ]]; do
       parameter="NEW"
       ;;
       
+    # Setup menu operations
+    "Set Server Address")
+      script="setup_ui"
+      parameter="Set Server Address"
+      ;;
+    "Set Server Port")
+      script="setup_ui"
+      parameter="Set Server Port"
+      ;;
+    "Set Server Path")
+      script="setup_ui"
+      parameter="Set Server Path"
+      ;;
+    "Set Checked Out Folder")
+      script="setup_ui"
+      parameter="Set Checked Out Folder"
+      ;;
+    "Set Checked In Folder")
+      script="setup_ui"
+      parameter="Set Checked In Folder"
+      ;;
+      
     # Offload menu operations
     "Set Destination")
       script="offload_ui"
@@ -358,6 +380,12 @@ if [ -n "$script" ]; then
     "setup"|"Setup")
       setup "$parameter" || handle_error "Setup operation failed"
       ;;
+    "Enable Offload")
+      set_offload_enabled "true" || handle_error "Failed to enable offload"
+      ;;
+    "Disable Offload")
+      set_offload_enabled "false" || handle_error "Failed to disable offload"
+      ;;
     "open")
       log_message "Attempting to open $CHECKEDOUT_FOLDER/$parameter"
       if ! repo_exists "$parameter" "$CHECKEDOUT_FOLDER"; then
@@ -372,6 +400,12 @@ if [ -n "$script" ]; then
       log_message "preparing for offload script"
       log_message "Parameter value: '$parameter'"
       log_message "Card name: '$CARD_NAME'"
+      
+      # Check if offload functionality is enabled
+      local offload_enabled=$(get_offload_enabled)
+      if [ "$offload_enabled" != "true" ]; then
+        handle_error "Offload functionality is disabled. Please enable it in the configuration first."
+      fi
       
       if [ "$progressbar" = true ]; then
         log_message "Running offload in progressbar mode"
@@ -453,6 +487,12 @@ if [ -n "$script" ]; then
       log_message "preparing for offload UI script"
       log_message "Parameter value: '$parameter'"
       
+      # Check if offload functionality is enabled
+      local offload_enabled=$(get_offload_enabled)
+      if [ "$offload_enabled" != "true" ]; then
+        handle_error "Offload functionality is disabled. Please enable it in the configuration first."
+      fi
+      
       # Parse offload UI parameters
       if [ -n "$parameter" ]; then
         IFS='|' read -r action type <<< "$parameter"
@@ -497,6 +537,17 @@ if [ -n "$script" ]; then
         esac
       else
         handle_error "Cleanup UI requires parameters: action|repo_name"
+      fi
+      ;;
+    "setup_ui")
+      log_message "preparing for setup UI script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse setup UI parameters
+      if [ -n "$parameter" ]; then
+        handle_setup_menu "$parameter" || handle_error "Failed to handle setup menu"
+      else
+        handle_error "Setup UI requires parameters: menu_item"
       fi
       ;;
     *)
@@ -560,7 +611,11 @@ display_navbar_menu() {
     # Display menu footer
     echo "----"
     echo "DISABLED|$APP_NAME Version $VERSION"
-    echo "Setup"
+    
+    # Add setup submenu
+    display_setup_submenu
+    
+    # Remove offload toggle from here (now in setup submenu)
     
     # Add cleanup submenu at the top (if there are removable repositories)
     if has_removable_repos; then
