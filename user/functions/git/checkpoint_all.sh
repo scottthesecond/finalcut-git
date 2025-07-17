@@ -65,6 +65,9 @@ checkpoint_all() {
     for repo_name in "${checkedout_repos[@]}"; do
         log_message "Processing repo: $repo_name"
         
+        # Set selected_repo for the filesystem functions
+        selected_repo="$repo_name"
+        
         # Change to the repository directory
         if ! cd "$CHECKEDOUT_FOLDER/$repo_name"; then
             log_message "Error: Failed to change to repository directory: $CHECKEDOUT_FOLDER/$repo_name"
