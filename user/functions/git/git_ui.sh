@@ -6,7 +6,8 @@
 get_git_config() {
     local config_key="$1"
     if [ -f "$CONFIG_FILE" ]; then
-        grep "^GIT_${config_key}=" "$CONFIG_FILE" | cut -d'=' -f2- | tr -d '"'
+        # Use head -1 to get only the first match if there are multiple lines
+        grep "^GIT_${config_key}=" "$CONFIG_FILE" | head -1 | cut -d'=' -f2- | tr -d '"'
     else
         echo ""
     fi
@@ -41,6 +42,12 @@ initialize_git_defaults() {
         set_git_config "SERVER_ADDRESS" ""
         set_git_config "SERVER_PORT" "22"
         set_git_config "SERVER_PATH" "~/repositories"
+        
+        # Also ensure the old SERVER_PATH variable is set for backwards compatibility
+        if [ -f "$CONFIG_FILE" ] && ! grep -q "^SERVER_PATH=" "$CONFIG_FILE"; then
+            echo "SERVER_PATH='~/repositories'" >> "$CONFIG_FILE"
+            log_message "Added old SERVER_PATH for backwards compatibility"
+        fi
     fi
 }
 

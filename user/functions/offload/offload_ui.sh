@@ -41,6 +41,7 @@ initialize_offload_defaults() {
         set_offload_config "TYPE" "video"
         set_offload_config "PROJECT_SHORTNAME" "PROJ"
         set_offload_config "COUNTER" "1"
+        set_offload_config "ENABLED" "false"
     fi
 }
 
@@ -92,6 +93,27 @@ get_project_shortname() {
         echo "PROJ"
     else
         echo "$shortname"
+    fi
+}
+
+# Function to get offload enabled status
+get_offload_enabled() {
+    local enabled=$(get_offload_config "ENABLED")
+    if [ -z "$enabled" ]; then
+        echo "false"
+    else
+        echo "$enabled"
+    fi
+}
+
+# Function to set offload enabled status
+set_offload_enabled() {
+    local enabled="$1"
+    if [ "$enabled" = "true" ] || [ "$enabled" = "false" ]; then
+        set_offload_config "ENABLED" "$enabled"
+        echo "Offload functionality ${enabled}"
+    else
+        echo "Invalid value: $enabled (must be 'true' or 'false')"
     fi
 }
 
@@ -152,6 +174,13 @@ set_offload_type() {
 
 # Function to display offload submenu
 display_offload_submenu() {
+    # Check if offload is enabled
+    local enabled=$(get_offload_enabled)
+    if [ "$enabled" != "true" ]; then
+        # If offload is disabled, don't display the submenu
+        return
+    fi
+    
     local current_dest=$(get_offload_destination)
     local current_type=$(get_offload_type)
     local current_shortname=$(get_project_shortname)
@@ -309,7 +338,8 @@ run_offload_with_progress() {
     local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
     # Ensure base_dest doesn't end with a slash to avoid double slashes
     local clean_base_dest=$(echo "$base_dest" | sed 's|/$||')
-    local full_dest_path="$clean_base_dest/$dest_folder"
+    # Normalize path to avoid double slashes
+    local full_dest_path=$(echo "$clean_base_dest/$dest_folder" | sed 's|//*|/|g')
     
     log_message "Running offload in progress mode"
     log_message "Input: $input_path"

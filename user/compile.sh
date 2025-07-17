@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.0.0a8"
+VERSION="3.0.0b2"
 NAME="UNFlab"
 
 # Default values
@@ -61,6 +61,7 @@ scripts=(
     "$FUNCTIONS/shared/vars.sh"
     "$FUNCTIONS/shared/logs.sh"
     "$FUNCTIONS/shared/setup.sh"
+    "$FUNCTIONS/shared/setup_ui.sh"
     "$FUNCTIONS/shared/select_repo.sh"
     "$FUNCTIONS/git/operations/checkConnectivity.sh"
     "$FUNCTIONS/git/operations/commitAndPush.sh"
@@ -76,6 +77,8 @@ scripts=(
     "$FUNCTIONS/git/checkpoint.sh"
     "$FUNCTIONS/git/checkpoint_all.sh"
     "$FUNCTIONS/git/checkout.sh"
+    "$FUNCTIONS/git/operations/cleanup.sh"
+    "$FUNCTIONS/git/cleanup_ui.sh"
     "$FUNCTIONS/shared/config.sh"
     "$FUNCTIONS/shared/dialogs.sh"
     "$FUNCTIONS/shared/fcp.sh"

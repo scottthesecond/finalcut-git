@@ -42,6 +42,26 @@ if [ -f "$CONFIG_FILE" ]; then
        log_message "Removed quotes from SERVER_PATH: '$SERVER_PATH'"
    fi
    
+   # Handle the case where SERVER_PATH is empty or not set
+   # Set a default value of ~/repositories
+   if [ -z "$SERVER_PATH" ]; then
+       SERVER_PATH="~/repositories"
+       log_message "SERVER_PATH was empty, setting default: '$SERVER_PATH'"
+       
+       # Update the config file with the default value
+       if [ -f "$CONFIG_FILE" ]; then
+           if grep -q "^SERVER_PATH=" "$CONFIG_FILE"; then
+               # Replace the existing SERVER_PATH line with the default
+               sed -i '' "s|^SERVER_PATH=.*|SERVER_PATH='$SERVER_PATH'|" "$CONFIG_FILE"
+               log_message "Updated empty SERVER_PATH in config file: '$SERVER_PATH'"
+           else
+               # Add the SERVER_PATH line if it doesn't exist
+               echo "SERVER_PATH='$SERVER_PATH'" >> "$CONFIG_FILE"
+               log_message "Added SERVER_PATH to config file: '$SERVER_PATH'"
+           fi
+       fi
+   fi
+   
    log_message "SERVER_PATH after config load: '$SERVER_PATH'"
 else
     setup
