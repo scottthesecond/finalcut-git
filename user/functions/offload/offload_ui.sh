@@ -338,9 +338,20 @@ run_offload_with_progress() {
         handle_error "Offload destination not set"
     fi
     
-    # Generate project shortname and source name from input path
+    # Generate project shortname
     local project_shortname=$(get_project_shortname)
-    local source_name=$(sanitize_source_name "$provided_source_name" "$input_path")
+    
+    # Handle source name logic
+    local source_name=""
+    if [ -n "$provided_source_name" ]; then
+        # If source name was provided, sanitize it
+        source_name=$(sanitize_source_name "$provided_source_name" "$input_path")
+        log_message "Using provided source name: $source_name"
+    else
+        # No source name provided - let the offload script handle it
+        # It will either extract from existing .offload file or prompt user
+        log_message "No source name provided, offload script will handle source name logic"
+    fi
     
     # Check if an offload is already in progress
     if check_offload_in_progress; then
@@ -364,27 +375,17 @@ run_offload_with_progress() {
     
     # Get and increment the counter
     local counter=$(increment_offload_counter)
-    local type_prefix=$(get_type_prefix "$type")
-    
-    # Create destination folder with the new naming scheme
-    local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
-    # Ensure base_dest doesn't end with a slash to avoid double slashes
-    local clean_base_dest=$(echo "$base_dest" | sed 's|/$||')
-    # Normalize path to avoid double slashes
-    local full_dest_path=$(echo "$clean_base_dest/$dest_folder" | sed 's|//*|/|g')
     
     log_message "Running offload in progress mode"
     log_message "Input: $input_path"
     log_message "Base Output: $base_dest"
-    log_message "Destination Folder: $dest_folder"
-    log_message "Full Output: $full_dest_path"
     log_message "Type: $type"
     log_message "Project: $project_shortname"
     log_message "Source: $source_name"
     log_message "Counter: $counter"
     
-    # Run offload
-    offload "$input_path" "$full_dest_path" "$project_shortname" "$source_name" "$type" "$counter"
+    # Run offload with base destination - the offload script will create the full path
+    offload "$input_path" "$base_dest" "$project_shortname" "$source_name" "$type" "$counter"
     local offload_exit_code=$?
     
     # If offload returned early (resume, retry, re-verify, or cancel), do not run verification
@@ -406,8 +407,15 @@ run_offload_with_progress() {
     fi
     
     # If we get here, it was a new offload, so run verification
-    log_message "Starting verification after new offload"
-    verify "$input_path" "$full_dest_path" || handle_error "Verification failed"
+    # We need to get the actual destination path from the .offload file
+    local offload_file="$input_path/.offload"
+    local actual_dest_path=""
+    if actual_dest_path=$(extract_destination_path_from_offload "$offload_file" ""); then
+        log_message "Starting verification after new offload"
+        verify "$input_path" "$actual_dest_path" || handle_error "Verification failed"
+    else
+        handle_error "Cannot determine destination path for verification"
+    fi
     
     log_message "Offload and verification complete"
     echo "Offload and verification complete!"

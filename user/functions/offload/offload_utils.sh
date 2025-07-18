@@ -48,46 +48,7 @@ sanitize_source_name() {
     echo "$source_name"
 }
 
-# Function to validate offload parameters
-validate_offload_params() {
-    local input_path="$1"
-    local output_path="$2"
-    local project_shortname="$3"
-    local source_name="$4"
-    local type="$5"
-    
-    # Validate input path
-    if [ -z "$input_path" ] || [ ! -d "$input_path" ]; then
-        log_message "Error: Invalid input path: $input_path"
-        return 1
-    fi
-    
-    # Validate output path
-    if [ -z "$output_path" ]; then
-        log_message "Error: Output path is required"
-        return 1
-    fi
-    
-    # Validate project shortname
-    if [ -z "$project_shortname" ]; then
-        log_message "Error: Project shortname is required"
-        return 1
-    fi
-    
-    # Validate source name
-    if [ -z "$source_name" ]; then
-        log_message "Error: Source name is required"
-        return 1
-    fi
-    
-    # Validate type
-    if ! validate_offload_type "$type"; then
-        log_message "Error: Invalid offload type: $type"
-        return 1
-    fi
-    
-    return 0
-}
+
 
 # Function to get connected SD cards and external devices
 get_connected_devices() {

@@ -3,11 +3,9 @@
 # Verify script for offloaded footage
 # Usage: verify <source_path> [destination_path]
 
-# Utility function to normalize file paths (remove double slashes and trailing slashes)
-normalize_path() {
-    local path="$1"
-    echo "$path" | sed 's|//*|/|g' | sed 's|/$||'
-}
+
+
+
 
 # Utility function to check if a file exists in a verify file
 file_exists_in_verify() {
@@ -18,14 +16,7 @@ file_exists_in_verify() {
     grep -q "/$parent_dir/$filename|" "$verify_file" 2>/dev/null
 }
 
-# Utility function to calculate progress percentage
-calculate_progress() {
-    local current="$1"
-    local total="$2"
-    local base="$3"
-    local range="$4"
-    echo $((base + (current * range / total)))
-}
+
 
 # Utility function to find all non-hidden files in a directory
 find_all_files() {
@@ -44,39 +35,11 @@ find_all_files() {
     printf '%s\0' "${files[@]}"
 }
 
-# Utility function to create temporary file with unique name
-create_temp_file() {
-    local prefix="$1"
-    echo "/tmp/${prefix}_$$"
-}
+# Note: create_temp_file, cleanup_temp_files, and normalize_path are now in offload_file_utils.sh
 
-# Function to validate input parameters
-validate_verify_params() {
-    local source_path="$1"
-    local destination_path="$2"
-    
-    # Check if source path is provided
-    if [ -z "$source_path" ]; then
-        handle_error "Usage: verify <source_path> [destination_path]"
-    fi
-    
-    # Validate source path exists
-    if [ ! -d "$source_path" ]; then
-        handle_error "Source path does not exist: $source_path"
-    fi
-    
-    log_message "Parameters validated successfully"
-}
 
-# Function to calculate SHA256 hash of a file
-calculate_hash() {
-    local file_path="$1"
-    if [ -f "$file_path" ]; then
-        shasum -a 256 "$file_path" | cut -d' ' -f1
-    else
-        echo ""
-    fi
-}
+
+# Note: calculate_hash() is now defined in offload_file_utils.sh
 
 # Function to get file size
 get_file_size() {
@@ -104,13 +67,24 @@ verify_files() {
     local failed_count=0
     
     # Create temporary file for updated offload file
-    local temp_offload="$offload_file.tmp"
+    local temp_offload=$(create_temp_file "offload_update")
     > "$temp_offload"
     
     show_details "Starting verification of $total_files files..."
     show_progress 10
     
-    while IFS='|' read -r source_file dest_file new_filename status source_size dest_size source_hash dest_hash; do
+    # Define a callback function for processing each entry
+    process_verify_entry() {
+        local line_number="$1"
+        local source_file="$2"
+        local dest_file="$3"
+        local new_filename="$4"
+        local status="$5"
+        local source_size="$6"
+        local dest_size="$7"
+        local source_hash="$8"
+        local dest_hash="$9"
+        
         ((current_file++))
         
         # Calculate progress percentage (10-90% range for verification phase)
@@ -121,61 +95,67 @@ verify_files() {
         show_details "Verifying file $current_file/$total_files..."
         
         # Check if source file exists
-        if [ ! -f "$source_file" ]; then
-            log_message "ERROR: Source file not found: $source_file"
-            show_details "✗ Source file not found: $(basename "$source_file")"
-            echo "$source_file|$dest_file|$new_filename|failed|0|0||" >> "$temp_offload"
+        if ! check_source_file_exists "$source_file" "$new_filename"; then
+            write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_FAILED" "0" "0" "" ""
             ((failed_count++))
-            continue
+            return
         fi
         
         # Check if destination file exists
-        if [ ! -f "$dest_file" ]; then
-            log_message "ERROR: Destination file not found: $dest_file"
-            show_details "✗ Destination file not found: $new_filename"
-            echo "$source_file|$dest_file|$new_filename|failed|0|0||" >> "$temp_offload"
+        if ! check_dest_file_exists "$dest_file" "$new_filename"; then
+            write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_FAILED" "0" "0" "" ""
             ((failed_count++))
-            continue
+            return
         fi
         
         # Calculate source file hash and size
         log_message "Calculating source file hash..."
-        local current_source_hash=$(calculate_hash "$source_file")
+        local current_source_hash
+        if ! current_source_hash=$(calculate_hash "$source_file"); then
+            log_message "ERROR: Failed to calculate source hash for $new_filename"
+            local current_source_size=$(get_file_size "$source_file")
+            write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_FAILED" "$current_source_size" "0" "" ""
+            ((failed_count++))
+            return
+        fi
         local current_source_size=$(get_file_size "$source_file")
         
         # Calculate destination file hash and size
         log_message "Calculating destination file hash..."
-        local current_dest_hash=$(calculate_hash "$dest_file")
+        local current_dest_hash
+        if ! current_dest_hash=$(calculate_hash "$dest_file"); then
+            log_message "ERROR: Failed to calculate destination hash for $new_filename"
+            local current_dest_size=$(get_file_size "$dest_file")
+            write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_FAILED" "$current_source_size" "$current_dest_size" "$current_source_hash" ""
+            ((failed_count++))
+            return
+        fi
         local current_dest_size=$(get_file_size "$dest_file")
         
         # Verify sizes match
-        if [ "$current_source_size" != "$current_dest_size" ]; then
-            log_message "ERROR: Size mismatch for $new_filename (source: $current_source_size, dest: $current_dest_size)"
-            show_details "✗ Size mismatch for $new_filename"
-            echo "$source_file|$dest_file|$new_filename|failed|$current_source_size|$current_dest_size|$current_source_hash|$current_dest_hash" >> "$temp_offload"
+        if ! compare_file_sizes "$current_source_size" "$current_dest_size" "$source_file" "$dest_file"; then
+            write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_FAILED" "$current_source_size" "$current_dest_size" "$current_source_hash" "$current_dest_hash"
             ((failed_count++))
-            continue
+            return
         fi
         
         # Verify hashes match
-        if [ "$current_source_hash" != "$current_dest_hash" ]; then
-            log_message "ERROR: Hash mismatch for $new_filename"
-            log_message "Source hash: $current_source_hash"
-            log_message "Dest hash: $current_dest_hash"
-            show_details "✗ Hash mismatch for $new_filename"
-            echo "$source_file|$dest_file|$new_filename|failed|$current_source_size|$current_dest_size|$current_source_hash|$current_dest_hash" >> "$temp_offload"
+        if ! compare_file_hashes "$current_source_hash" "$current_dest_hash" "$source_file" "$dest_file"; then
+            write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_FAILED" "$current_source_size" "$current_dest_size" "$current_source_hash" "$current_dest_hash"
             ((failed_count++))
-            continue
+            return
         fi
         
         # Update status to verified with current hash/size data
-        echo "$source_file|$dest_file|$new_filename|verified|$current_source_size|$current_dest_size|$current_source_hash|$current_dest_hash" >> "$temp_offload"
+        write_offload_entry "$temp_offload" "$source_file" "$dest_file" "$new_filename" "$STATUS_VERIFIED" "$current_source_size" "$current_dest_size" "$current_source_hash" "$current_dest_hash"
         
         log_message "✓ Verified: $new_filename (size: $current_source_size, hash: ${current_source_hash:0:8}...)"
         show_details "✓ Verified: $new_filename"
         ((verified_count++))
-        
-    done < "$offload_file"
+    }
+    
+    # Process the offload file using the utility function
+    read_offload_file "$offload_file" "process_verify_entry"
     
     # Replace offload file with updated version
     mv "$temp_offload" "$offload_file"
@@ -326,32 +306,44 @@ prepare_destination_hashes() {
         local subdir_name=$(basename "$(dirname "$offload_file")")
         log_message "Processing .offload file: $subdir_name"
         
-        # Extract hashes from .offload file
-        while IFS='|' read -r source_file dest_file new_filename status source_size dest_size source_hash dest_hash; do
+        # Extract hashes from .offload file using utility function
+        process_offload_entry() {
+            local line_number="$1"
+            local source_file="$2"
+            local dest_file="$3"
+            local new_filename="$4"
+            local status="$5"
+            local source_size="$6"
+            local dest_size="$7"
+            local source_hash="$8"
+            local dest_hash="$9"
+            
             if [ -f "$dest_file" ]; then
                 # Check if we already have this file in .verify
                 if ! file_exists_in_verify "$dest_file" "$verify_file"; then
                     if [ -n "$dest_hash" ] && [ "$dest_hash" != "" ]; then
                         # Use existing hash from .offload file (new format)
-                        local normalized_dest=$(normalize_path "$dest_file")
-                        echo "$normalized_dest|$dest_hash|$dest_size" >> "$verify_file"
+                        write_verify_entry "$verify_file" "$dest_file" "$dest_hash" "$dest_size"
                         log_message "Added hash from .offload: $(basename "$dest_file")"
                     else
                         # File exists but no hash in .offload (old format), calculate new one
                         show_details "Calculating hash for: $(basename "$dest_file")"
-                        local new_hash=$(calculate_hash "$dest_file")
-                        local new_size=$(get_file_size "$dest_file")
-                        if [ -n "$new_hash" ]; then
-                            local normalized_dest=$(normalize_path "$dest_file")
-                            echo "$normalized_dest|$new_hash|$new_size" >> "$verify_file"
+                        local new_hash
+                        if new_hash=$(calculate_hash "$dest_file"); then
+                            local new_size=$(get_file_size "$dest_file")
+                            write_verify_entry "$verify_file" "$dest_file" "$new_hash" "$new_size"
                             log_message "Calculated new hash: $(basename "$dest_file")"
+                        else
+                            log_message "ERROR: Failed to calculate hash for $(basename "$dest_file")"
                         fi
                     fi
                 else
                     log_message "File already in .verify: $(basename "$dest_file")"
                 fi
             fi
-        done < "$offload_file"
+        }
+        
+        read_offload_file "$offload_file" "process_offload_entry"
     done
     
     # STEP 2: Find all files and identify missing ones
@@ -393,12 +385,14 @@ prepare_destination_hashes() {
             show_progress $progress
             
             show_details "Rebuilding verification database ($current_file/$missing_count: $(basename "$file_path"))"
-            local file_hash=$(calculate_hash "$file_path")
-            local file_size=$(get_file_size "$file_path")
-            if [ -n "$file_hash" ]; then
+            local file_hash
+            if file_hash=$(calculate_hash "$file_path"); then
+                local file_size=$(get_file_size "$file_path")
                 local normalized_path=$(normalize_path "$file_path")
-                echo "$normalized_path|$file_hash|$file_size" >> "$verify_file"
+                write_verify_entry "$verify_file" "$normalized_path" "$file_hash" "$file_size"
                 log_message "Calculated hash for: $(basename "$file_path")"
+            else
+                log_message "ERROR: Failed to calculate hash for $(basename "$file_path")"
             fi
         done < "$temp_missing"
     else
@@ -439,26 +433,34 @@ prepare_source_hashes() {
         log_message "Found source .offload file, extracting existing hashes"
         #show_details "Extracting existing hashes from .offload file"
         
-        # Extract existing hashes from .offload file
-        while IFS='|' read -r source_file dest_file new_filename status source_size dest_size source_hash dest_hash; do
+        # Extract existing hashes from .offload file using utility function
+        process_source_offload_entry() {
+            local line_number="$1"
+            local source_file="$2"
+            local dest_file="$3"
+            local new_filename="$4"
+            local status="$5"
+            local source_size="$6"
+            local dest_size="$7"
+            local source_hash="$8"
+            local dest_hash="$9"
+            
             if [ -f "$source_file" ]; then
                 # Check if we already have this file in .verify
                 if ! file_exists_in_verify "$source_file" "$source_verify_file"; then
                     if [ -n "$source_hash" ] && [ "$source_hash" != "" ]; then
-                        local normalized_source=$(normalize_path "$source_file")
-                        echo "$normalized_source|$source_hash|$source_size" >> "$source_verify_file"
-                        echo "$normalized_source|$source_hash|$source_size" >> "$source_hashes_file"
+                        write_verify_entry "$source_verify_file" "$source_file" "$source_hash" "$source_size"
+                        write_verify_entry "$source_hashes_file" "$source_file" "$source_hash" "$source_size"
                         log_message "Using existing hash for: $(basename "$source_file")"
-                        #show_details "Using existing hash for: $(basename "$source_file")"
                     else
-                        #show_details "Calculating hash for: $(basename "$source_file")"
-                        local new_hash=$(calculate_hash "$source_file")
-                        local new_size=$(get_file_size "$source_file")
-                        if [ -n "$new_hash" ]; then
-                            local normalized_source=$(normalize_path "$source_file")
-                            echo "$normalized_source|$new_hash|$new_size" >> "$source_verify_file"
-                            echo "$normalized_source|$new_hash|$new_size" >> "$source_hashes_file"
+                        local new_hash
+                        if new_hash=$(calculate_hash "$source_file"); then
+                            local new_size=$(get_file_size "$source_file")
+                            write_verify_entry "$source_verify_file" "$source_file" "$new_hash" "$new_size"
+                            write_verify_entry "$source_hashes_file" "$source_file" "$new_hash" "$new_size"
                             log_message "Calculated new hash for: $(basename "$source_file")"
+                        else
+                            log_message "ERROR: Failed to calculate hash for $(basename "$source_file")"
                         fi
                     fi
                 else
@@ -472,7 +474,9 @@ prepare_source_hashes() {
                     fi
                 fi
             fi
-        done < "$source_offload_file"
+        }
+        
+        read_offload_file "$source_offload_file" "process_source_offload_entry"
     fi
     
     # STEP 2: Find all files and identify missing ones
@@ -518,13 +522,15 @@ prepare_source_hashes() {
             show_details "Rebuilding source verification database ($current_file/$missing_count: $(basename "$file_path"))"
 
             #show_details "Calculating hash for: $current_file/$missing_count: $(basename "$file_path")"
-            local file_hash=$(calculate_hash "$file_path")
-            local file_size=$(get_file_size "$file_path")
-            if [ -n "$file_hash" ]; then
+            local file_hash
+            if file_hash=$(calculate_hash "$file_path"); then
+                local file_size=$(get_file_size "$file_path")
                 local normalized_path=$(normalize_path "$file_path")
-                echo "$normalized_path|$file_hash|$file_size" >> "$source_verify_file"
-                echo "$normalized_path|$file_hash|$file_size" >> "$source_hashes_file"
+                write_verify_entry "$source_verify_file" "$normalized_path" "$file_hash" "$file_size"
+                write_verify_entry "$source_hashes_file" "$normalized_path" "$file_hash" "$file_size"
                 log_message "Calculated hash for: $(basename "$file_path")"
+            else
+                log_message "ERROR: Failed to calculate hash for $(basename "$file_path")"
             fi
         done < "$temp_missing"
     else
@@ -533,12 +539,14 @@ prepare_source_hashes() {
     fi
     
     # Add all existing files to source_hashes_file for processing
-    while IFS= read -r file_path; do
-        local existing_line=$(grep "^$file_path|" "$source_verify_file" 2>/dev/null)
-        if [ -n "$existing_line" ]; then
-            echo "$existing_line" >> "$source_hashes_file"
-        fi
-    done < <(cat "$temp_missing" 2>/dev/null || true)
+    if [ -f "$temp_missing" ] && [ -s "$temp_missing" ]; then
+        while IFS= read -r file_path; do
+            local existing_line=$(grep "^$file_path|" "$source_verify_file" 2>/dev/null)
+            if [ -n "$existing_line" ]; then
+                echo "$existing_line" >> "$source_hashes_file"
+            fi
+        done < "$temp_missing"
+    fi
     
     # Clean up temp file
     rm -f "$temp_missing"
@@ -889,22 +897,32 @@ verify_external_source() {
             if [ "$source_hash" = "$dest_hash" ]; then
                 # Found a match by hash, now check if the destination file's current hash matches the stored hash
                 if [ -f "$dest_file" ]; then
-                    local current_dest_hash=$(calculate_hash "$dest_file")
-                    if [ "$current_dest_hash" = "$dest_hash" ]; then
-                        # File matches and is unmodified
-                        local dest_filename=$(basename "$dest_file")
-                        local dest_subdir=$(basename "$(dirname "$dest_file")")
-                        echo "✓ $filename → $dest_subdir/$dest_filename" >> "$temp_matched"
-                        log_message "✓ Matched: $filename → $dest_subdir/$dest_filename"
-                        show_details "✓ Matched: $filename"
-                        match_found=true
-                        ((matched_count++))
-                        break
+                    local current_dest_hash
+                    if current_dest_hash=$(calculate_hash "$dest_file"); then
+                                                if [ "$current_dest_hash" = "$dest_hash" ]; then
+                            # File matches and is unmodified
+                            local dest_filename=$(basename "$dest_file")
+                            local dest_subdir=$(basename "$(dirname "$dest_file")")
+                            echo "✓ $filename → $dest_subdir/$dest_filename" >> "$temp_matched"
+                            log_message "✓ Matched: $filename → $dest_subdir/$dest_filename"
+                            show_details "✓ Matched: $filename"
+                            match_found=true
+                            ((matched_count++))
+                            break
+                        else
+                            # File has been modified since .verify was created
+                            echo "❌ $filename (Destination file modified)" >> "$temp_unmatched"
+                            log_message "❌ Destination file modified: $dest_file"
+                            show_details "❌ Modified: $filename"
+                            match_found=true
+                            ((unmatched_count++))
+                            break
+                        fi
                     else
-                        # File has been modified since .verify was created
-                        echo "❌ $filename (Destination file modified)" >> "$temp_unmatched"
-                        log_message "❌ Destination file modified: $dest_file"
-                        show_details "❌ Modified: $filename"
+                        # Hash calculation failed
+                        echo "❌ $filename (Hash calculation failed)" >> "$temp_unmatched"
+                        log_message "❌ Hash calculation failed for destination file: $dest_file"
+                        show_details "❌ Hash failed: $filename"
                         match_found=true
                         ((unmatched_count++))
                         break
@@ -1099,9 +1117,13 @@ transfer_missing_files() {
     # Update .verify file with new files
     for file in "$transfer_dest"/*; do
         if [ -f "$file" ]; then
-            local file_hash=$(calculate_hash "$file")
-            local file_size=$(get_file_size "$file")
-            echo "$file|$file_hash|$file_size" >> "$destination_path/.verify"
+            local file_hash
+            if file_hash=$(calculate_hash "$file"); then
+                local file_size=$(get_file_size "$file")
+                write_verify_entry "$destination_path/.verify" "$file" "$file_hash" "$file_size"
+            else
+                log_message "ERROR: Failed to calculate hash for transferred file: $(basename "$file")"
+            fi
         fi
     done
 }

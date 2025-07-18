@@ -74,59 +74,47 @@ export navbar
 export progressbar
 export droplet
 
-# Check for droplet mode first (before argument parsing)
-if [[ "$1" == "-droplet" ]]; then
+# --- DROPLET HANDLING: allow -droplet anywhere in the arguments ---
+if [[ " $@ " =~ " -droplet " ]]; then
+    # Remove -droplet from arguments
+    args=()
+    for arg in "$@"; do
+        if [ "$arg" != "-droplet" ]; then
+            args+=("$arg")
+        fi
+    done
+    set -- "${args[@]}"
     droplet=true
-    shift  # Remove the -droplet flag
-    
-    log_message "Running in droplet mode"
-    
+    log_message "Running in droplet mode (detected anywhere in args)"
     # If no arguments left, just exit silently (opened directly)
     if [ $# -eq 0 ]; then
         log_message "Droplet opened directly (no files/folders dropped), exiting."
         exit 0
     fi
-    
     # In droplet mode, treat all remaining arguments as folders to offload
     for dropped_item in "$@"; do
         log_message "Processing dropped item: $dropped_item"
-        
         if [ -d "$dropped_item" ]; then
-            log_message "Dropped item is a directory, prompting for card name"
-            
-            # Prompt for card name using AppleScript with proper button handling
-            result=$(osascript -e 'display dialog "Enter a name for this card:" default answer "" buttons {"Cancel", "OK"} default button "OK"' 2>&1)
-            osascript_status=$?
-            
-            # Check if osascript failed
-            if [ $osascript_status -ne 0 ]; then
-                log_message "Error: Failed to display card name dialog. Status: $osascript_status, Error: $result"
-                continue
-            fi
-            
-            log_message "Result: $result"
-
-            # Parse the result
-            button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
-            card_name=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
-            
-            if [ "$button_clicked" = "Cancel" ]; then
-                log_message "User canceled card name dialog"
-                continue
-            fi
-            
-            if [ -n "$card_name" ]; then
-                log_message "Card name entered: $card_name"
-                # Launch progress app with card name as additional parameter
-                launch_progress_app "offload" "$dropped_item" "$card_name"
+            log_message "Dropped item is a directory, checking if offload is in progress"
+            # Check if an offload is already in progress
+            if check_offload_in_progress; then
+                # No offload in progress, we can proceed immediately
+                log_message "No offload in progress, launching offload immediately"
+                launch_progress_app "offload" "$dropped_item" ""
             else
-                log_message "No card name entered, skipping offload"
+                # Offload is in progress, queue this one
+                log_message "Offload already in progress, adding to queue"
+                if queue_offload "$dropped_item" ""; then
+                    log_message "Successfully queued offload for: $dropped_item"
+                else
+                    log_message "Failed to queue offload for: $dropped_item"
+                    osascript -e 'display alert "Offload Queue Error" message "Failed to add offload to queue. Please try again."'
+                fi
             fi
         else
             log_message "Dropped item is not a directory, skipping: $dropped_item"
         fi
     done
-    
     exit 0
 fi
 

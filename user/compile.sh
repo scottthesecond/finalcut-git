@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.0.0b2"
+VERSION="3.0.0b3"
 NAME="UNFlab"
 
 # Default values
@@ -85,6 +85,7 @@ scripts=(
     "$FUNCTIONS/git/enable_auto_checkpoint.sh"
     "$FUNCTIONS/offload/offload_utils.sh"
     "$FUNCTIONS/offload/offload_queue.sh"
+    "$FUNCTIONS/offload/offload_file_utils.sh"
     "$FUNCTIONS/offload/offload.sh"
     "$FUNCTIONS/offload/offload_ui.sh"
     "$FUNCTIONS/offload/verify.sh"

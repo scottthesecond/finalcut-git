@@ -109,11 +109,13 @@ scan_input_directory() {
     local type="$4"
     local offload_file="$5"
     local counter="$6"
+    local output_path="$7"  # Add output_path parameter
     
     local type_prefix=$(get_type_prefix "$type")
     local file_counter=1
     local skipped_count=0
     local ignore_file_src="$input_path/.ignore"
+    local ignore_file_dest="$output_path/.ignore"  # Define ignore_file_dest here
     > "$ignore_file_src"
     # Don't create destination .ignore file yet - destination directory doesn't exist
     
@@ -142,7 +144,8 @@ scan_input_directory() {
             echo "$file_path|$skip_reason" >> "$ignore_file_src"
             # Only write to destination .ignore if destination directory exists
             if [ -d "$(dirname "$ignore_file_dest")" ]; then
-                fi
+                echo "$file_path|$skip_reason" >> "$ignore_file_dest"
+            fi
             continue
         fi
         
@@ -166,8 +169,8 @@ scan_input_directory() {
             dest_path=$(echo "$output_path/$new_filename" | sed 's|//*|/|g')
         fi
         
-        # Add to offload file with unified format: source_file|dest_file|new_filename|status|source_size|dest_size|source_hash|dest_hash
-        echo "$file_path|$dest_path|$new_filename|queued|0|0||" >> "$offload_file"
+        # Add to offload file using the utility function
+        write_offload_entry "$offload_file" "$file_path" "$dest_path" "$new_filename" "$STATUS_QUEUED" "0" "0" "" ""
         
         log_message "Queued: $file_path -> $dest_path"
         ((file_counter++))
@@ -211,7 +214,7 @@ copy_files() {
         
         if [ "$status" = "queued" ] || [ "$status" = "unverified" ]; then
             # Calculate progress percentage (20-80% range for copy phase)
-            local progress=$((20 + (current_file * 60 / total_files)))
+            local progress=$(calculate_progress $current_file $total_files 20 60)
             show_progress $progress
             
             log_message "Copying file $current_file/$total_files: $source_path"
@@ -220,19 +223,39 @@ copy_files() {
             # Copy the file and capture any error output
             local copy_output
             if copy_output=$(cp "$source_path" "$dest_path" 2>&1); then
+                # Verify the copy was successful by checking file existence and size
+                if ! check_dest_file_exists "$dest_path" "$new_filename"; then
+                    log_message "ERROR: Copy appeared successful but destination file doesn't exist: $dest_path"
+                    update_offload_status_by_line "$offload_file" "$current_file" "$status" "$STATUS_FAILED"
+                    continue
+                fi
+                
+                # Get source and destination sizes for comparison
+                local source_size_actual=$(get_file_size_safe "$source_path")
+                local dest_size_actual=$(get_file_size_safe "$dest_path")
+                
+                if ! compare_file_sizes "$source_size_actual" "$dest_size_actual" "$source_path" "$dest_path"; then
+                    # Remove the incomplete destination file
+                    rm -f "$dest_path" 2>/dev/null
+                    update_offload_status_by_line "$offload_file" "$current_file" "$status" "$STATUS_FAILED"
+                    continue
+                fi
+                
                 # Update status to unverified
-                sed -i '' "${current_file}s/$status$/unverified/" "$offload_file"
+                update_offload_status_by_line "$offload_file" "$current_file" "$status" "$STATUS_UNVERIFIED"
                 
-                # Add same entry to destination offload file
-                echo "$source_path|$dest_path|$new_filename|unverified|$source_size|$dest_size|$source_hash|$dest_hash" >> "$dest_offload_file"
+                # Add same entry to destination offload file with actual sizes
+                write_offload_entry "$dest_offload_file" "$source_path" "$dest_path" "$new_filename" "$STATUS_UNVERIFIED" "$source_size_actual" "$dest_size_actual" "$source_hash" "$dest_hash"
                 
-                log_message "Successfully copied: $new_filename"
+                log_message "Successfully copied: $new_filename (size: $source_size_actual bytes)"
                 show_details "✓ Copied: $new_filename"
             else
                 log_message "ERROR: Failed to copy $source_path: $copy_output"
                 show_details "✗ Failed to copy: $(basename "$source_path")"
+                # Remove any partial destination file that might have been created
+                rm -f "$dest_path" 2>/dev/null
                 # Update status to failed
-                sed -i '' "${current_file}s/$status$/failed/" "$offload_file"
+                update_offload_status_by_line "$offload_file" "$current_file" "$status" "$STATUS_FAILED"
             fi
         fi
     done < "$offload_file"
@@ -246,41 +269,17 @@ copy_files() {
 # Function to check offload status from .offload file
 check_offload_status() {
     local offload_file="$1"
-    local status=""
-    local total_files=0
-    local completed_files=0
-    local failed_files=0
-    local queued_files=0
-
+    
     if [ ! -f "$offload_file" ]; then
         echo "none"
         return
     fi
 
-    # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
-    while IFS='|' read -r source_path dest_path new_filename status rest; do
-        # Ignore empty lines
-        if [ -z "$source_path" ] && [ -z "$dest_path" ] && [ -z "$new_filename" ] && [ -z "$status" ]; then
-            continue
-        fi
-        ((total_files++))
-        case "$status" in
-            "verified")
-                ((completed_files++))
-                ;;
-            "failed")
-                ((failed_files++))
-                ;;
-            "queued")
-                ((queued_files++))
-                ;;
-            "unverified")
-                ((completed_files++))
-                ;;
-        esac
-    done < "$offload_file"
+    # Get statistics using the utility function
+    local stats=$(get_offload_stats "$offload_file")
+    IFS='|' read -r total_files completed_files failed_files queued_files unverified_files <<< "$stats"
 
-    log_message "DEBUG: check_offload_status: total_files=$total_files, completed_files=$completed_files, failed_files=$failed_files, queued_files=$queued_files"
+    log_message "DEBUG: check_offload_status: total_files=$total_files, completed_files=$completed_files, failed_files=$failed_files, queued_files=$queued_files, unverified_files=$unverified_files"
 
     # Determine overall status
     if [ "$total_files" -eq 0 ]; then
@@ -296,43 +295,59 @@ check_offload_status() {
     fi
 }
 
-# Function to get offload statistics
-get_offload_stats() {
+# Function to get offload statistics (wrapper for utility function)
+get_offload_stats_wrapper() {
     local offload_file="$1"
-    local total_files=0
-    local completed_files=0
-    local failed_files=0
-    local queued_files=0
-
+    
     if [ ! -f "$offload_file" ]; then
-        echo "0|0|0|0"
+        echo "0|0|0|0|0"
         return
     fi
 
-    # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
-    while IFS='|' read -r source_path dest_path new_filename status rest; do
-        # Ignore empty lines
-        if [ -z "$source_path" ] && [ -z "$dest_path" ] && [ -z "$new_filename" ] && [ -z "$status" ]; then
-            continue
-        fi
-        ((total_files++))
-        case "$status" in
-            "verified")
-                ((completed_files++))
-                ;;
-            "failed")
-                ((failed_files++))
-                ;;
-            "queued")
-                ((queued_files++))
-                ;;
-            "unverified")
-                ((completed_files++))
-                ;;
-        esac
-    done < "$offload_file"
+    # Use the utility function from offload_file_utils.sh
+    get_offload_stats "$offload_file"
+}
 
-    echo "$total_files|$completed_files|$failed_files|$queued_files"
+# Function to prompt user for source name
+prompt_source_name() {
+    local input_path="$1"
+    local default_name=""
+    
+    # Try to generate a default name from the input path
+    if [ -n "$input_path" ]; then
+        default_name=$(basename "$input_path" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g')
+        if [ -z "$default_name" ]; then
+            default_name="source"
+        fi
+    fi
+    
+    # Prompt for source name using AppleScript with proper button handling
+    local result=$(osascript -e "display dialog \"Enter a name for this card:\" default answer \"$default_name\" buttons {\"Cancel\", \"OK\"} default button \"OK\"" 2>&1)
+    local osascript_status=$?
+    
+    # Check if osascript failed
+    if [ $osascript_status -ne 0 ]; then
+        log_message "Error: Failed to display source name dialog. Status: $osascript_status, Error: $result"
+        return 1
+    fi
+    
+    # Parse the result
+    local button_clicked=$(echo "$result" | sed -n 's/.*button returned:\(.*\), text returned.*/\1/p' | tr -d ', ')
+    local source_name=$(echo "$result" | sed -n 's/.*text returned:\(.*\)/\1/p' | tr -d ', ')
+    
+    if [ "$button_clicked" = "Cancel" ]; then
+        log_message "User canceled source name dialog"
+        return 1
+    fi
+    
+    if [ -n "$source_name" ]; then
+        log_message "Source name entered: $source_name"
+        echo "$source_name"
+        return 0
+    else
+        log_message "No source name entered"
+        return 1
+    fi
 }
 
 # Function to prompt user for offload action when existing file is found
@@ -342,9 +357,9 @@ prompt_offload_action() {
     local status="$3"
     local stats="$4"
     
-    IFS='|' read -r total_files completed_files failed_files queued_files <<< "$stats"
+    IFS='|' read -r total_files completed_files failed_files queued_files unverified_files <<< "$stats"
     
-    log_message "DEBUG: prompt_offload_action: total_files=$total_files, completed_files=$completed_files, failed_files=$failed_files, queued_files=$queued_files, status=$status"
+    log_message "DEBUG: prompt_offload_action: total_files=$total_files, completed_files=$completed_files, failed_files=$failed_files, queued_files=$queued_files, unverified_files=$unverified_files, status=$status"
 
     local message=""
     local buttons=""
@@ -396,7 +411,8 @@ EOF
     fi
     
     # Parse the result to get just the button name
-    local choice=$(echo "$result" | sed -n 's/.*button returned:\(.*\)/\1/p' | tr -d ', ')
+    # osascript returns just the button name, not "button returned:ButtonName"
+    local choice=$(echo "$result")
     log_message "DEBUG: parsed dialog choice: '$choice'"
     
     echo "$choice"
@@ -418,34 +434,34 @@ resume_offload() {
     
     # Determine the correct destination path from the offload file
     local actual_output_path=""
-    if [ -n "$output_path" ]; then
-        actual_output_path="$output_path"
-    else
-        # Extract destination path from first line of offload file
-        local first_line=$(head -n 1 "$offload_file")
-        if [ -n "$first_line" ]; then
-            IFS='|' read -r source_file dest_file new_filename status <<< "$first_line"
-            actual_output_path=$(dirname "$dest_file")
-            log_message "Extracted destination path from .offload file: $actual_output_path"
-            show_details "Using existing destination: $(basename "$actual_output_path")"
-        else
-            handle_error "Cannot determine destination path from .offload file"
-        fi
+    if ! actual_output_path=$(extract_destination_path_from_offload "$offload_file" "$output_path"); then
+        handle_error "Cannot determine destination path from .offload file"
+    fi
+    
+    show_details "Using existing destination: $(basename "$actual_output_path")"
+    
+    # Validate that the destination path exists and is writable
+    if [ ! -d "$actual_output_path" ]; then
+        handle_error "Destination path does not exist: $actual_output_path"
+    fi
+    
+    if [ ! -w "$actual_output_path" ]; then
+        handle_error "Destination path is not writable: $actual_output_path"
     fi
     
     # Get statistics
-    local stats=$(get_offload_stats "$offload_file")
-    IFS='|' read -r total_files completed_files failed_files queued_files <<< "$stats"
+    local stats=$(get_offload_stats_wrapper "$offload_file")
+    IFS='|' read -r total_files completed_files failed_files queued_files unverified_files <<< "$stats"
     
-    log_message "Resume stats - Total: $total_files, Completed: $completed_files, Failed: $failed_files, Queued: $queued_files"
+    log_message "Resume stats - Total: $total_files, Completed: $completed_files, Failed: $failed_files, Queued: $queued_files, Unverified: $unverified_files"
     show_details "Resuming: $queued_files files remaining"
     
     # Copy remaining files
     copy_files "$offload_file" "$actual_output_path" "$input_path"
     
     # Display summary
-    local final_stats=$(get_offload_stats "$offload_file")
-    IFS='|' read -r final_total final_completed final_failed final_queued <<< "$final_stats"
+    local final_stats=$(get_offload_stats_wrapper "$offload_file")
+    IFS='|' read -r final_total final_completed final_failed final_queued final_unverified <<< "$final_stats"
     
     show_progress 100
     show_details "Resume complete!"
@@ -481,40 +497,38 @@ retry_failed_offload() {
 
     # Determine the correct destination path from the offload file
     local actual_output_path=""
-    if [ -n "$output_path" ]; then
-        actual_output_path="$output_path"
-    else
-        # Extract destination path from first line of offload file
-        local first_line=$(head -n 1 "$offload_file")
-        if [ -n "$first_line" ]; then
-            IFS='|' read -r source_file dest_file new_filename status <<< "$first_line"
-            actual_output_path=$(dirname "$dest_file")
-            log_message "Extracted destination path from .offload file: $actual_output_path"
-            show_details "Using existing destination: $(basename "$actual_output_path")"
-        else
-            handle_error "Cannot determine destination path from .offload file"
-        fi
+    if ! actual_output_path=$(extract_destination_path_from_offload "$offload_file" "$output_path"); then
+        handle_error "Cannot determine destination path from .offload file"
+    fi
+    
+    show_details "Using existing destination: $(basename "$actual_output_path")"
+    
+    # Validate that the destination path exists and is writable
+    if [ ! -d "$actual_output_path" ]; then
+        handle_error "Destination path does not exist: $actual_output_path"
+    fi
+    
+    if [ ! -w "$actual_output_path" ]; then
+        handle_error "Destination path is not writable: $actual_output_path"
     fi
 
     # Get statistics BEFORE modifying the file
-    local stats=$(get_offload_stats "$offload_file")
-    IFS='|' read -r total_files completed_files failed_files queued_files <<< "$stats"
-    log_message "Retry stats - Total: $total_files, Completed: $completed_files, Failed: $failed_files"
+    local stats=$(get_offload_stats_wrapper "$offload_file")
+    IFS='|' read -r total_files completed_files failed_files queued_files unverified_files <<< "$stats"
+    log_message "Retry stats - Total: $total_files, Completed: $completed_files, Failed: $failed_files, Unverified: $unverified_files"
     show_details "Retrying: $failed_files failed files"
 
-    # Only change 'failed' to 'queued', leave all other lines untouched
-    local tmpfile="${offload_file}.tmp"
-    awk -F'|' '{
-        if ($4 == "failed") $4 = "queued";
-        print $1 "|" $2 "|" $3 "|" $4 "|" $5 "|" $6 "|" $7 "|" $8
-    }' "$offload_file" > "$tmpfile" && mv "$tmpfile" "$offload_file"
+    # Use the utility function to update all failed statuses to queued
+    if ! update_failed_to_queued "$offload_file"; then
+        handle_error "Failed to update offload file for retry"
+    fi
 
     # Copy files (this will retry the failed ones)
     copy_files "$offload_file" "$actual_output_path" "$input_path"
 
     # Display summary
-    local final_stats=$(get_offload_stats "$offload_file")
-    IFS='|' read -r final_total final_completed final_failed final_queued <<< "$final_stats"
+    local final_stats=$(get_offload_stats_wrapper "$offload_file")
+    IFS='|' read -r final_total final_completed final_failed final_queued final_unverified <<< "$final_stats"
 
     show_progress 100
     show_details "Retry complete!"
@@ -545,19 +559,19 @@ reverify_offload() {
     
     # Determine the correct destination path from the offload file
     local actual_output_path=""
-    if [ -n "$output_path" ]; then
-        actual_output_path="$output_path"
-    else
-        # Extract destination path from first line of offload file
-        local first_line=$(head -n 1 "$offload_file")
-        if [ -n "$first_line" ]; then
-            IFS='|' read -r source_file dest_file new_filename status <<< "$first_line"
-            actual_output_path=$(dirname "$dest_file")
-            log_message "Extracted destination path from .offload file: $actual_output_path"
-            show_details "Using existing destination: $(basename "$actual_output_path")"
-        else
-            handle_error "Cannot determine destination path from .offload file"
-        fi
+    if ! actual_output_path=$(extract_destination_path_from_offload "$offload_file" "$output_path"); then
+        handle_error "Cannot determine destination path from .offload file"
+    fi
+    
+    show_details "Using existing destination: $(basename "$actual_output_path")"
+    
+    # Validate that the destination path exists and is readable
+    if [ ! -d "$actual_output_path" ]; then
+        handle_error "Destination path does not exist: $actual_output_path"
+    fi
+    
+    if [ ! -r "$actual_output_path" ]; then
+        handle_error "Destination path is not readable: $actual_output_path"
     fi
     
     # Run verification
@@ -598,19 +612,29 @@ offload() {
     show_details "Type: $type"
     show_details "Counter: $counter"
     
-    # Validate parameters
-    validate_offload_params "$input_path" "$output_path" "$project_shortname" "$source_name" "$type"
-    
-    # Check for existing offload file
+    # Check for existing offload file first
     local offload_file="$input_path/.offload"
+    local existing_offload=false
+    
     if [ -f "$offload_file" ]; then
+        existing_offload=true
         log_message "Found existing .offload file: $offload_file"
         show_details "Found existing offload file"
+        
+        # If no source name provided, try to extract from existing .offload file
+        if [ -z "$source_name" ]; then
+            if source_name=$(extract_source_name_from_offload "$offload_file"); then
+                log_message "Extracted source name from existing .offload file: $source_name"
+                show_details "Using existing source name: $source_name"
+            else
+                log_message "Failed to extract source name from .offload file, will prompt user"
+            fi
+        fi
         
         # Check offload status
         local status=$(check_offload_status "$offload_file")
         # Get stats BEFORE any file is cleared or overwritten
-        local stats=$(get_offload_stats "$offload_file")
+        local stats=$(get_offload_stats_wrapper "$offload_file")
 
         log_message "Offload status: $status"
         log_message "Offload stats: $stats"
@@ -671,16 +695,46 @@ offload() {
         fi
     fi
     
+    # If no source name is available (either not provided or couldn't extract from .offload file), prompt user
+    if [ -z "$source_name" ]; then
+        show_details "Prompting for source name..."
+        if ! source_name=$(prompt_source_name "$input_path"); then
+            log_message "User cancelled source name prompt"
+            show_details "Offload cancelled by user"
+            echo "Offload cancelled"
+            return 0
+        fi
+        log_message "Source name determined: $source_name"
+        show_details "Source name: $source_name"
+    fi
+    
+    # Validate parameters
+    validate_offload_params "$input_path" "$output_path" "$project_shortname" "$source_name" "$type"
+    
+    # Create the full destination path if only base destination was provided
+    local full_dest_path="$output_path"
+    if [ -d "$output_path" ] && [ "$output_path" = "$(get_offload_config "DESTINATION")" ]; then
+        # This is a base destination, create the full path with naming scheme
+        local type_prefix=$(get_type_prefix "$type")
+        local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
+        # Ensure output_path doesn't end with a slash to avoid double slashes
+        local clean_output_path=$(echo "$output_path" | sed 's|/$||')
+        # Normalize path to avoid double slashes
+        full_dest_path=$(echo "$clean_output_path/$dest_folder" | sed 's|//*|/|g')
+        log_message "Created full destination path: $full_dest_path"
+        show_details "Destination: $(basename "$full_dest_path")"
+    fi
+    
     # Clear/create offload file
     > "$offload_file"
     log_message "Created offload tracking file: $offload_file"
     show_details "Created offload tracking file"
     
     # Scan input directory and build file list
-    scan_input_directory "$input_path" "$project_shortname" "$source_name" "$type" "$offload_file" "$counter"
+    scan_input_directory "$input_path" "$project_shortname" "$source_name" "$type" "$offload_file" "$counter" "$full_dest_path"
     
     # Copy files and update status
-    copy_files "$offload_file" "$output_path" "$input_path"
+    copy_files "$offload_file" "$full_dest_path" "$input_path"
     
     # Display summary - count successfully copied files (unverified status means copied but not yet verified)
     local total_files=$(wc -l < "$offload_file")
@@ -702,5 +756,5 @@ offload() {
         log_message "Failed: $failed_count"
     fi
     
-    echo "Offload complete! $copied_count files copied to $output_path"
+    echo "Offload complete! $copied_count files copied to $full_dest_path"
 } 
