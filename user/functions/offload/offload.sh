@@ -711,6 +711,13 @@ offload() {
     # Validate parameters
     validate_offload_params "$input_path" "$output_path" "$project_shortname" "$source_name" "$type"
     
+    # Check disk space before starting offload
+    show_details "Checking disk space..."
+    local required_size_kb=$(estimate_offload_size "$input_path")
+    if ! check_disk_space "$output_path" "$required_size_kb"; then
+        handle_error "Insufficient disk space on destination drive. Please free up space and try again."
+    fi
+    
     # Create the full destination path if only base destination was provided
     local full_dest_path="$output_path"
     if [ -d "$output_path" ] && [ "$output_path" = "$(get_offload_config "DESTINATION")" ]; then

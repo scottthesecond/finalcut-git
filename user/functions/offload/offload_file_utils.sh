@@ -109,6 +109,47 @@ clear_progress_tracker() {
     log_message "Progress tracker cleared"
 }
 
+# Function to check available disk space
+# Usage: check_disk_space "$path" "$required_size_kb"
+check_disk_space() {
+    local path="$1"
+    local required_size_kb="$2"
+    
+    # Get available space in KB
+    local available_kb=$(df -k "$path" | awk 'NR==2 {print $4}')
+    
+    if [ -z "$available_kb" ] || [ "$available_kb" -lt "$required_size_kb" ]; then
+        log_message "ERROR: Insufficient disk space on $path"
+        log_message "Available: ${available_kb}KB, Required: ${required_size_kb}KB"
+        return 1
+    fi
+    
+    log_message "Disk space check passed: ${available_kb}KB available, ${required_size_kb}KB required"
+    return 0
+}
+
+# Function to estimate required disk space for offload
+# Usage: estimate_offload_size "$input_path"
+estimate_offload_size() {
+    local input_path="$1"
+    local total_size_kb=0
+    
+    # Calculate total size of all files in input directory
+    while IFS= read -r file; do
+        if [ -f "$file" ]; then
+            local file_size_kb=$(stat -f%z "$file" 2>/dev/null || echo "0")
+            file_size_kb=$((file_size_kb / 1024))  # Convert bytes to KB
+            total_size_kb=$((total_size_kb + file_size_kb))
+        fi
+    done < <(find "$input_path" -type f 2>/dev/null)
+    
+    # Add 10% buffer for overhead
+    local buffer_kb=$((total_size_kb / 10))
+    total_size_kb=$((total_size_kb + buffer_kb))
+    
+    echo "$total_size_kb"
+}
+
 # Function to validate file path exists and is readable
 validate_file_path() {
     local file_path="$1"
@@ -470,13 +511,21 @@ update_offload_status_by_line() {
     ' OFS='|' "$file" > "$temp_file"; then
         
         # Move temp file to final location
-        if mv "$temp_file" "$file"; then
+        # Handle permission issues on external drives (like SD cards)
+        if mv "$temp_file" "$file" 2>/dev/null; then
             log_message "Successfully updated offload file: $file"
             return 0
         else
-            log_message "ERROR: Failed to update offload file: $file"
-            rm -f "$temp_file" 2>/dev/null
-            return 1
+            # If mv fails due to permissions, try cp then rm
+            if cp "$temp_file" "$file" 2>/dev/null; then
+                rm -f "$temp_file" 2>/dev/null
+                log_message "Successfully updated offload file using cp+rm: $file"
+                return 0
+            else
+                log_message "ERROR: Failed to update offload file: $file"
+                rm -f "$temp_file" 2>/dev/null
+                return 1
+            fi
         fi
     else
         log_message "ERROR: Failed to process offload file: $file"
@@ -518,13 +567,21 @@ update_offload_status_by_source() {
     ' OFS='|' "$file" > "$temp_file"; then
         
         # Move temp file to final location
-        if mv "$temp_file" "$file"; then
+        # Handle permission issues on external drives (like SD cards)
+        if mv "$temp_file" "$file" 2>/dev/null; then
             log_message "Successfully updated offload file: $file"
             return 0
         else
-            log_message "ERROR: Failed to update offload file: $file"
-            rm -f "$temp_file" 2>/dev/null
-            return 1
+            # If mv fails due to permissions, try cp then rm
+            if cp "$temp_file" "$file" 2>/dev/null; then
+                rm -f "$temp_file" 2>/dev/null
+                log_message "Successfully updated offload file using cp+rm: $file"
+                return 0
+            else
+                log_message "ERROR: Failed to update offload file: $file"
+                rm -f "$temp_file" 2>/dev/null
+                return 1
+            fi
         fi
     else
         log_message "ERROR: Failed to process offload file: $file"
@@ -560,13 +617,21 @@ update_failed_to_queued() {
     ' OFS='|' "$file" > "$temp_file"; then
         
         # Move temp file to final location
-        if mv "$temp_file" "$file"; then
+        # Handle permission issues on external drives (like SD cards)
+        if mv "$temp_file" "$file" 2>/dev/null; then
             log_message "Successfully updated offload file for retry: $file"
             return 0
         else
-            log_message "ERROR: Failed to update offload file: $file"
-            rm -f "$temp_file" 2>/dev/null
-            return 1
+            # If mv fails due to permissions, try cp then rm
+            if cp "$temp_file" "$file" 2>/dev/null; then
+                rm -f "$temp_file" 2>/dev/null
+                log_message "Successfully updated offload file for retry using cp+rm: $file"
+                return 0
+            else
+                log_message "ERROR: Failed to update offload file: $file"
+                rm -f "$temp_file" 2>/dev/null
+                return 1
+            fi
         fi
     else
         log_message "ERROR: Failed to process offload file: $file"

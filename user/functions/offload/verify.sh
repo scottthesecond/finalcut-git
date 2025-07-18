@@ -158,7 +158,18 @@ verify_files() {
     read_offload_file "$offload_file" "process_verify_entry"
     
     # Replace offload file with updated version
-    mv "$temp_offload" "$offload_file"
+    # Handle permission issues on external drives (like SD cards)
+    if ! mv "$temp_offload" "$offload_file" 2>/dev/null; then
+        # If mv fails due to permissions, try cp then rm
+        if cp "$temp_offload" "$offload_file" 2>/dev/null; then
+            rm -f "$temp_offload" 2>/dev/null
+            log_message "Used cp+rm instead of mv due to permission restrictions"
+        else
+            log_message "ERROR: Failed to update offload file due to permission restrictions"
+            # Continue with the temp file for now
+            offload_file="$temp_offload"
+        fi
+    fi
     
     # If this was a source .offload file, also update the destination .offload file
     if [ "$(dirname "$offload_file")" = "$source_path" ]; then

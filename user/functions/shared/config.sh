@@ -12,7 +12,7 @@ if [ -f "$CONFIG_FILE" ]; then
    # This happens when the config file contains ~/something but gets expanded locally
    if [[ "$SERVER_PATH" == "$HOME"/* ]]; then
        # Convert back to tilde notation for remote server paths
-       local fixed_path=$(echo "$SERVER_PATH" | sed "s|^$HOME|~|")
+       fixed_path=$(echo "$SERVER_PATH" | sed "s|^$HOME|~|")
        SERVER_PATH="$fixed_path"
        log_message "SERVER_PATH was expanded from tilde, converting back: '$SERVER_PATH'"
        
