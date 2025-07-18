@@ -407,15 +407,8 @@ if [ -n "$script" ]; then
               log_message "Using card name as source name: $source_name"
             fi
             
-            # For droplet calls to progress app, the parameter might be "input_path|card_name"
-            # Check if we have exactly 2 parts and the second looks like a card name (not a path)
-            local parts=($(echo "$parameter" | tr '|' '\n'))
-            if [ ${#parts[@]} -eq 2 ] && [[ ! "${parts[1]}" =~ ^/ ]]; then
-              log_message "Detected droplet format: input_path='${parts[0]}', card_name='${parts[1]}'"
-              run_offload_with_progress "${parts[0]}" "${parts[1]}" || handle_error "Offload operation failed"
-            else
-              run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
-            fi
+            # For droplet calls, just use the parsed input_path and source_name
+            run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
           else
             handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
           fi

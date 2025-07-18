@@ -31,6 +31,13 @@ should_skip_file() {
             ;;
     esac
     
+    # Skip macOS resource fork files (files starting with ._)
+    if [[ "$filename" == ._* ]]; then
+        reason="Skip macOS resource fork file: $filename"
+        echo "$reason"
+        return 0
+    fi
+    
     # Skip files within hidden folders
     local dir_path=$(dirname "$file_path")
     if [[ "$dir_path" == *"/."* ]]; then
@@ -201,8 +208,14 @@ copy_files() {
     local ignore_file_src="$input_path/.ignore"
     local ignore_file_dest=$(echo "$output_path/.ignore" | sed 's|//*|/|g')
     if [ -f "$ignore_file_src" ]; then
-        cp "$ignore_file_src" "$ignore_file_dest"
-        log_message "Created destination ignore file: $ignore_file_dest"
+        # Copy without extended attributes to avoid permission issues on some filesystems
+        if cp -X "$ignore_file_src" "$ignore_file_dest" 2>/dev/null; then
+            log_message "Created destination ignore file: $ignore_file_dest"
+        elif cp "$ignore_file_src" "$ignore_file_dest" 2>/dev/null; then
+            log_message "Created destination ignore file: $ignore_file_dest (with extended attributes)"
+        else
+            log_message "Warning: Could not copy .ignore file to destination (permission denied)"
+        fi
     fi
     
     log_message "Starting file copy process for $total_files files"
@@ -286,10 +299,12 @@ check_offload_status() {
         echo "none"
     elif [ "$queued_files" -gt 0 ]; then
         echo "incomplete"
-    elif [ "$failed_files" -gt 0 ] && [ "$queued_files" -eq 0 ]; then
+    elif [ "$failed_files" -gt 0 ]; then
         echo "failed"
     elif [ "$completed_files" -eq "$total_files" ]; then
         echo "complete"
+    elif [ "$unverified_files" -gt 0 ]; then
+        echo "incomplete"
     else
         echo "unknown"
     fi
