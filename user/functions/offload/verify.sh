@@ -213,6 +213,14 @@ verify_files() {
     local source_name=$(basename "$source_path" | tr ' ' '_')
     local report_file="$destination_path/verification_report_${source_name}_${timestamp}.txt"
     
+    # Get skipped files information from .ignore file
+    local ignore_file="$source_path/.ignore"
+    local skipped_files_count=0
+    
+    if [ -f "$ignore_file" ]; then
+        skipped_files_count=$(wc -l < "$ignore_file" 2>/dev/null || echo "0")
+    fi
+    
     {
         echo "# Verification Report - $(basename "$source_path") - $(date)"
         echo ""
@@ -222,6 +230,7 @@ verify_files() {
         echo "- Total files: $total_files"
         echo "- Files verified: $verified_count"
         echo "- Files failed: $failed_count"
+        echo "- Files intentionally skipped: $skipped_files_count"
         if [ "$total_files" -gt 0 ]; then
             local success_percentage=$((verified_count * 100 / total_files))
             echo "- Verification status: ${success_percentage}% Complete"
@@ -237,6 +246,16 @@ verify_files() {
         if [ "$failed_count" -gt 0 ]; then
             echo "## Failed Files"
             cat "$temp_unmatched"
+            echo ""
+        fi
+        
+        if [ "$skipped_files_count" -gt 0 ]; then
+            echo "## Skipped Files"
+            echo "The following files were intentionally skipped during offload:"
+            echo ""
+            while IFS='|' read -r skipped_file reason; do
+                echo "- $(basename "$skipped_file"): $reason"
+            done < "$ignore_file"
             echo ""
         fi
         
@@ -256,7 +275,7 @@ verify_files() {
     show_details "Report saved: $(basename "$report_file")"
     
     # Prompt for user action
-    local action=$(prompt_verification_action "$failed_count")
+    local action=$(prompt_verification_action "$failed_count" "$report_file")
     
     case "$action" in
         "Transfer Missing Files")
@@ -719,6 +738,18 @@ generate_verification_report() {
     local total_unmatched=$(wc -l < "$unmatched_files" 2>/dev/null || echo "0")
     local total_dest_files=$(wc -l < "$verify_file")
     
+    # Get skipped files information from .ignore file
+    local ignore_file="$source_path/.ignore"
+    local skipped_files_count=0
+    local skipped_files_content=""
+    
+    if [ -f "$ignore_file" ]; then
+        skipped_files_count=$(wc -l < "$ignore_file" 2>/dev/null || echo "0")
+        if [ "$skipped_files_count" -gt 0 ]; then
+            skipped_files_content=$(cat "$ignore_file" 2>/dev/null || echo "")
+        fi
+    fi
+    
     # Create report
     {
         echo "# Verification Report - $(basename "$source_path") - $(date)"
@@ -729,6 +760,7 @@ generate_verification_report() {
         echo "- Total files on source: $total_source_files"
         echo "- Files with matches: $total_matched"
         echo "- Files without matches: $total_unmatched"
+        echo "- Files intentionally skipped: $skipped_files_count"
         echo "- Total files in destination: $total_dest_files"
         if [ "$total_source_files" -gt 0 ]; then
             local match_percentage=$((total_matched * 100 / total_source_files))
@@ -745,6 +777,16 @@ generate_verification_report() {
         if [ "$total_unmatched" -gt 0 ]; then
             echo "## Unmatched Files (Missing from Destination)"
             cat "$unmatched_files"
+            echo ""
+        fi
+        
+        if [ "$skipped_files_count" -gt 0 ]; then
+            echo "## Skipped Files"
+            echo "The following files were intentionally skipped during offload:"
+            echo ""
+            while IFS='|' read -r skipped_file reason; do
+                echo "- $(basename "$skipped_file"): $reason"
+            done < "$ignore_file"
             echo ""
         fi
         
@@ -984,7 +1026,7 @@ verify_external_source() {
     fi
     
     # Prompt for user action
-    local action=$(prompt_verification_action "$unmatched_count")
+    local action=$(prompt_verification_action "$unmatched_count" "$report_file")
     
     case "$action" in
         "Transfer Missing Files")
@@ -1041,6 +1083,7 @@ format_file_size() {
 # Function to prompt for verification action
 prompt_verification_action() {
     local unmatched_count="$1"
+    local report_file="$2"
     
     log_message "Prompting for verification action with unmatched_count: $unmatched_count"
     
@@ -1058,11 +1101,11 @@ prompt_verification_action() {
     # Build the osascript command with proper button syntax
     local osascript_cmd
     if [ "$unmatched_count" -gt 0 ]; then
-        # For failed verifications: Transfer, Reverify, Done (3 buttons)
-        osascript_cmd="display dialog \"$message\" buttons {\"Transfer Missing Files\", \"Full Reverify\", \"Done\"} default button \"Done\" with title \"Verification Complete\""
+        # For failed verifications: Transfer, Reverify, Open Report, Done (4 buttons)
+        osascript_cmd="display dialog \"$message\" buttons {\"Transfer Missing Files\", \"Full Reverify\", \"Open Report\", \"Done\"} default button \"Done\" with title \"Verification Complete\""
     else
-        # For successful verifications: Format Card, Done (2 buttons)
-        osascript_cmd="display dialog \"$message\" buttons {\"Format Card\", \"Done\"} default button \"Done\" with title \"Verification Complete\""
+        # For successful verifications: Format Card, Open Report, Done (3 buttons)
+        osascript_cmd="display dialog \"$message\" buttons {\"Format Card\", \"Open Report\", \"Done\"} default button \"Done\" with title \"Verification Complete\""
     fi
     
     log_message "Showing dialog with message: $message"
@@ -1082,6 +1125,18 @@ prompt_verification_action() {
     local choice=$(echo "$result" | sed -n 's/.*button returned:\(.*\)/\1/p' | tr -d ', ')
     
     log_message "Dialog returned choice: '$choice'"
+    
+    # Handle "Open Report" choice
+    if [ "$choice" = "Open Report" ] && [ -n "$report_file" ] && [ -f "$report_file" ]; then
+        log_message "Opening verification report: $report_file"
+        open "$report_file"
+        
+        # Show the prompt again after opening the report
+        sleep 1  # Brief pause to let the report open
+        prompt_verification_action "$unmatched_count" "$report_file"
+        return
+    fi
+    
     printf "%s" "$choice"
 }
 
