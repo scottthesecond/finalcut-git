@@ -2,6 +2,8 @@
 
 **Finalcut-git** (also known as **UNFlab** by the team at Unnamed Films) is an open-source solution for synchronizing Final Cut Pro libraries between remote editors. It provides a user-friendly interface for Git-based version control specifically designed for video editing workflows.
 
+It's a wildly over-complicated collection of Bash scripts that work really nicely when compiled together and dropped into Platypus.  And it sure as shit gets the job done!
+
 ## What It Does
 
 Finalcut-git solves the common problem of collaborating on Final Cut Pro projects across multiple editors and locations. It provides:

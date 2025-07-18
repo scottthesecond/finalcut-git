@@ -1125,6 +1125,9 @@ prompt_verification_action() {
     local choice=$(echo "$result" | sed -n 's/.*button returned:\(.*\)/\1/p' | tr -d ', ')
     
     log_message "Dialog returned choice: '$choice'"
+    log_message "Raw result: '$result'"
+    log_message "Report file: '$report_file'"
+    log_message "Report file exists: $([ -f "$report_file" ] && echo "yes" || echo "no")"
     
     # Handle "Open Report" choice
     if [ "$choice" = "Open Report" ] && [ -n "$report_file" ] && [ -f "$report_file" ]; then
@@ -1133,7 +1136,8 @@ prompt_verification_action() {
         
         # Show the prompt again after opening the report
         sleep 1  # Brief pause to let the report open
-        prompt_verification_action "$unmatched_count" "$report_file"
+        local final_choice=$(prompt_verification_action "$unmatched_count" "$report_file")
+        printf "%s" "$final_choice"
         return
     fi
     
