@@ -53,7 +53,7 @@ struct SetupView: View {
                             .foregroundColor(.orange)
                     }
                     
-                    Text("UNFlab needs to be configured before you can use it.")
+                    Text("PostSync needs to be configured before you can use it.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)

@@ -18,13 +18,13 @@ struct AppConfig: Codable {
 class ConfigManager: ObservableObject {
     @Published var config: AppConfig
     
-    private let configKey = "UNFlabConfig"
+    private let configKey = "PostSyncConfig"
     private let configFileName = "config.json"
     
     // File-based storage (similar to current .config file)
     private var configFileURL: URL {
         let dataFolder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("UNFlab")
+            .appendingPathComponent("PostSync")
         
         // Create directory if it doesn't exist
         try? FileManager.default.createDirectory(at: dataFolder, withIntermediateDirectories: true)
