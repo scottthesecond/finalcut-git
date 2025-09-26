@@ -12,7 +12,7 @@ struct MenuBarView: View {
             HStack {
                 Image(systemName: "film")
                     .foregroundColor(.blue)
-                Text("UNFlab")
+                Text("PostSync")
                     .font(.headline)
                     .fontWeight(.semibold)
                 Spacer()

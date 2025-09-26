@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct UNFlabApp: App {
+struct PostSyncApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
@@ -23,7 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         
         if let statusBarButton = statusBarItem?.button {
-            statusBarButton.image = NSImage(systemSymbolName: "film", accessibilityDescription: "UNFlab")
+            statusBarButton.image = NSImage(systemSymbolName: "film", accessibilityDescription: "PostSync")
             statusBarButton.action = #selector(togglePopover)
         }
         

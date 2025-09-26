@@ -16,7 +16,7 @@ struct SetupView: View {
                 Image(systemName: "gear.circle.fill")
                     .font(.system(size: 40))
                     .foregroundColor(.blue)
-                Text("UNFlab Setup")
+                Text("PostSync Setup")
                     .font(.title2)
                     .fontWeight(.semibold)
             }

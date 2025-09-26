@@ -6,7 +6,7 @@ struct ContentView: View {
             Image(systemName: "film")
                 .imageScale(.large)
                 .foregroundStyle(.tint)
-            Text("UNFlab - Final Cut Pro Git Manager")
+            Text("PostSync - Final Cut Pro Git Manager")
                 .font(.title2)
                 .fontWeight(.semibold)
             Text("This app runs in the menu bar")
