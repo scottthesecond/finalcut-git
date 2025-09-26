@@ -1,7 +1,5 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 Finalcut-git (also known as UNFLab by the team at Unnamed Films) is a collection of bash scripts that are compiled into an appication by Platypus.  The application uses GIT to sync Final Cut libraries between different editors all working remotely.  
 The bash scripts are stored inside /user/functions, and they are all compiled into one bash script with /user/compile.sh. 

@@ -1,7 +1,6 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+globs: user/*,server/*
+alwaysApply: false
 ---
 logging functions are defined in logs.sh.
 
