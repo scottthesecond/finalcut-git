@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.0.0a3"
+VERSION="3.0.0a8"
 NAME="UNFlab"
 
 # Default values
@@ -76,6 +76,8 @@ scripts=(
     "$FUNCTIONS/git/checkpoint.sh"
     "$FUNCTIONS/git/checkpoint_all.sh"
     "$FUNCTIONS/git/checkout.sh"
+    "$FUNCTIONS/git/operations/cleanup.sh"
+    "$FUNCTIONS/git/cleanup_ui.sh"
     "$FUNCTIONS/shared/config.sh"
     "$FUNCTIONS/shared/dialogs.sh"
     "$FUNCTIONS/shared/fcp.sh"
@@ -145,7 +147,7 @@ if [ "$build_with_platypus" = true ]; then
 
     # Check if any of the UNFlab apps are running and quit them
     progress_app_name="$NAME Progress"
-    droplet_app_name="$NAME Offload Droplet"
+    droplet_app_name="$NAME Offload"
     
     # Quit main UNFlab app
     if pgrep -f "$NAME.app" > /dev/null; then

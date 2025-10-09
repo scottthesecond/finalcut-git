@@ -196,6 +196,7 @@ display_offload_submenu() {
     
     submenu_items="$submenu_items|----"
     submenu_items="$submenu_items|Offload"
+    submenu_items="$submenu_items|Verify External Card"
     
     # Output the submenu in Platypus format
     echo "SUBMENU|Offload|$submenu_items"
@@ -227,6 +228,9 @@ handle_offload_menu() {
         "Offload")
             launch_offload_droplet
             ;;
+        "Verify External Card")
+            launch_external_verification
+            ;;
         *)
             echo "Unknown offload menu item: $menu_item"
             ;;
@@ -243,7 +247,7 @@ launch_offload_droplet() {
     fi
     
     # Get the path to the bundled droplet app
-    local droplet_app_path="${SCRIPT_DIR}/UNFlab Offload Droplet.app"
+    local droplet_app_path="${SCRIPT_DIR}/UNFlab Offload.app"
     
     log_message "Launching offload droplet: $droplet_app_path"
     
@@ -255,8 +259,30 @@ launch_offload_droplet() {
     else
         log_message "Droplet app not found at bundled location, trying Applications folder"
         # Fallback: try to find it in Applications
-        open -a "UNFlab Offload Droplet"
+        open -a "UNFlab Offload"
         log_message "Fallback droplet launch command completed"
+    fi
+}
+
+# Function to launch external verification
+launch_external_verification() {
+    local dest=$(get_offload_config "DESTINATION")
+    
+    if [ -z "$dest" ]; then
+        handle_error "Offload destination not set. Please set a destination first."
+    fi
+    
+    # Use device selection with a custom prompt
+    local prompt_text="Choose an SD card to verify against $dest"
+    local source_path=$(select_connected_device "$prompt_text")
+    
+    if [ -n "$source_path" ]; then
+        log_message "Starting external verification: $source_path -> $dest"
+        
+        # Always launch progress app for verification (provides progress feedback and cancel option)
+        launch_progress_app "verify_external" "$source_path" "$dest"
+    else
+        log_message "No source selected for external verification"
     fi
 }
 
@@ -281,7 +307,8 @@ run_offload_with_progress() {
     
     # Create destination folder with the new naming scheme
     local dest_folder="${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}"
-    local full_dest_path="$base_dest/$dest_folder"
+    # Normalize path to avoid double slashes
+    local full_dest_path=$(echo "$base_dest/$dest_folder" | sed 's|//*|/|g')
     
     log_message "Running offload in progress mode"
     log_message "Input: $input_path"
@@ -297,12 +324,18 @@ run_offload_with_progress() {
     offload "$input_path" "$full_dest_path" "$project_shortname" "$source_name" "$type" "$counter"
     local offload_exit_code=$?
     
-    # Check if offload returned early (resume, retry, or re-verify)
+    # If offload returned early (resume, retry, re-verify, or cancel), do not run verification
     if [ $offload_exit_code -eq 0 ]; then
-        # Since we're not capturing output, we can't check the result message
-        # The offload function will handle its own completion messages
-        log_message "Offload operation completed successfully"
-        return 0
+        # Check if the offload was a resume, retry, or re-verify by inspecting the output message
+        # (offload returns 0 for both new and resumed/retried offloads, so we need a better signal)
+        # For now, assume that if the .offload file existed before, offload handled verification or resume
+        # Otherwise, always run verification after a new offload
+        local offload_file="$input_path/.offload"
+        if [ -f "$offload_file.backup" ]; then
+            # There was an existing offload, so we returned early
+            log_message "Offload operation completed (resume/retry/re-verify/cancel), skipping verification step."
+            return 0
+        fi
     elif [ $offload_exit_code -ne 0 ]; then
         handle_error "Offload operation failed"
     fi
@@ -313,4 +346,25 @@ run_offload_with_progress() {
     
     log_message "Offload and verification complete"
     echo "Offload and verification complete!"
+}
+
+# Function to run external verification with progress bar
+run_verify_external_with_progress() {
+    local source_path="$1"
+    local destination_path="$2"
+    
+    log_message "Running external verification in progress mode"
+    log_message "Source: $source_path"
+    log_message "Destination: $destination_path"
+    
+    # Run external verification with progress feedback
+    verify_external_source "$source_path" "$destination_path"
+    local verify_exit_code=$?
+    
+    if [ $verify_exit_code -eq 0 ]; then
+        log_message "External verification completed successfully"
+        echo "External verification completed successfully!"
+    else
+        handle_error "External verification failed"
+    fi
 } 

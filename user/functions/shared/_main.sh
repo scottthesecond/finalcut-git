@@ -28,7 +28,7 @@ launch_progress_app() {
     esac
     
     # Get the path to the bundled progress bar app
-    # SCRIPT_DIR points to the Resources folder in the bundled app
+    # SCRIPT_DIR now points to the main app's Resources folder (thanks to vars.sh fix)
     local progress_app_path="${SCRIPT_DIR}/UNFlab Progress.app"
     
     log_message "Progress app path: $progress_app_path"
@@ -152,20 +152,12 @@ while [[ "$1" != "" ]]; do
       ;;
       
     # Progress bar operations (when launched from status menu)
-    checkout|checkin|checkpoint|offload)
+    checkout|checkin|checkpoint|offload|verify_external)
       if [ "$progressbar" = true ]; then
         script="$1"
         shift
-        if [ -n "$1" ]; then
-          parameter="$1"
-          # For offload, also capture the card name as the third argument
-          if [ "$script" = "offload" ] && [ -n "$2" ]; then
-            shift
-            # Store the card name in a way that can be accessed later
-            CARD_NAME="$1"
-            log_message "Captured card name for offload: $CARD_NAME"
-          fi
-        fi
+        # Always join all remaining args as pipe-separated for parameter
+        parameter="$(printf "%s|" "$@" | sed 's/|$//')"
         break
       fi
       ;;
@@ -182,6 +174,13 @@ while [[ "$1" != "" ]]; do
       script="checkpointall"
       ;;
       
+    Remove\ \"*from\ cache)
+      repo_name=$(echo "$1" | sed -n 's/^Remove "\([^"]*\)".*/\1/p')
+      script="cleanup_ui"
+      parameter="remove|$repo_name"
+      ;;
+
+
     # Check in operations (from submenus)
     "Check In "*)
       script="checkin"
@@ -226,6 +225,13 @@ while [[ "$1" != "" ]]; do
       parameter=$(echo "$1" | sed 's/ ↳ Check In //')
       ;;
       
+    # Open operations
+    "Open "*)
+      script="open"
+      parameter=$(echo "$1" | sed 's/^Open //' | tr -d '"')
+      log_message "Extracted open parameter: '$parameter'"
+      ;;
+      
     # New Project creation from submenu
     "New Project...")
       script="checkout"
@@ -261,7 +267,11 @@ while [[ "$1" != "" ]]; do
       script="offload_ui"
       parameter="launch_droplet"
       ;;
-      
+    "Verify External Card")
+      script="offload_ui"
+      parameter="verify_external"
+      ;;
+            
     # Default case for direct script/parameter pairs and quoted project names
     *)
       if [ -z "$script" ]; then
@@ -275,8 +285,9 @@ while [[ "$1" != "" ]]; do
   shift
 done
 
-# Enable auto checkpoint only in statusbar mode (after argument parsing)
+# Enable auto checkpoint and cleanup worker only in statusbar mode (after argument parsing)
 enable_auto_checkpoint
+enable_cleanup_worker
 
 # Log the final script and parameter values
 log_message "Script: $script"
@@ -332,6 +343,9 @@ if [ -n "$script" ]; then
     "checkpointall") 
       checkpoint_all || handle_error "Checkpoint all operation failed"
       ;;
+    "cleanup_check")
+      cleanup_check || handle_error "Cleanup check operation failed"
+      ;;
     "setup"|"Setup")
       setup "$parameter" || handle_error "Setup operation failed"
       ;;
@@ -340,7 +354,9 @@ if [ -n "$script" ]; then
       if ! repo_exists "$parameter" "$CHECKEDOUT_FOLDER"; then
         handle_error "Project directory not found: $parameter"
       else
-        open "$CHECKEDOUT_FOLDER/$parameter" || handle_error "Failed to open project: $parameter"
+        # Set selected_repo for the open_fcp_or_directory function
+        selected_repo="$parameter"
+        open_fcp_or_directory
       fi
       ;;
     "offload")
@@ -366,7 +382,15 @@ if [ -n "$script" ]; then
               log_message "Using card name as source name: $source_name"
             fi
             
-            run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
+            # For droplet calls to progress app, the parameter might be "input_path|card_name"
+            # Check if we have exactly 2 parts and the second looks like a card name (not a path)
+            local parts=($(echo "$parameter" | tr '|' '\n'))
+            if [ ${#parts[@]} -eq 2 ] && [[ ! "${parts[1]}" =~ ^/ ]]; then
+              log_message "Detected droplet format: input_path='${parts[0]}', card_name='${parts[1]}'"
+              run_offload_with_progress "${parts[0]}" "${parts[1]}" || handle_error "Offload operation failed"
+            else
+              run_offload_with_progress "$input_path" "$source_name" || handle_error "Offload operation failed"
+            fi
           else
             handle_error "Offload requires parameters: input_path|output_path|project_shortname|source_name|type"
           fi
@@ -398,6 +422,24 @@ if [ -n "$script" ]; then
         handle_error "Verify requires parameters: source_path|destination_path"
       fi
       ;;
+    "verify_external")
+      log_message "preparing for external verify script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse external verify parameters (source_path|destination_path)
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r source_path destination_path <<< "$parameter"
+        
+        if [ "$progressbar" = true ]; then
+          log_message "Running external verify in progressbar mode"
+          run_verify_external_with_progress "$source_path" "$destination_path" || handle_error "External verify operation failed"
+        else
+          verify_external_source "$source_path" "$destination_path" || handle_error "External verify operation failed"
+        fi
+      else
+        handle_error "External verify requires parameters: source_path|destination_path"
+      fi
+      ;;
     "offload_ui")
       log_message "preparing for offload UI script"
       log_message "Parameter value: '$parameter'"
@@ -418,12 +460,34 @@ if [ -n "$script" ]; then
           "launch_droplet")
             launch_offload_droplet || handle_error "Failed to launch droplet"
             ;;
+          "verify_external")
+            launch_external_verification || handle_error "Failed to launch external verification"
+            ;;
           *)
             handle_error "Unknown offload UI action: $action"
             ;;
         esac
       else
         handle_error "Offload UI requires parameters: action|type"
+      fi
+      ;;
+    "cleanup_ui")
+      log_message "preparing for cleanup UI script"
+      log_message "Parameter value: '$parameter'"
+      
+      # Parse cleanup UI parameters
+      if [ -n "$parameter" ]; then
+        IFS='|' read -r action repo_name <<< "$parameter"
+        case $action in
+          "remove")
+            prompt_remove_repository "$repo_name" || handle_error "Failed to remove repository"
+            ;;
+          *)
+            handle_error "Unknown cleanup UI action: $action"
+            ;;
+        esac
+      else
+        handle_error "Cleanup UI requires parameters: action|repo_name"
       fi
       ;;
     *)
@@ -457,9 +521,9 @@ display_navbar_menu() {
             
             # Create submenu for this project
             if [ -n "$last_checkpoint" ]; then
-                echo "SUBMENU|$repo_name|DISABLED|Last Autosave: $last_checkpoint|Check In \"$repo_name\"|Quick Save \"$repo_name\""
+                echo "SUBMENU|$repo_name|DISABLED|Last Autosave: $last_checkpoint|Open \"$repo_name\"|Check In \"$repo_name\""
             else
-                echo "SUBMENU|$repo_name|Check In \"$repo_name\"|Quick Save \"$repo_name\""
+                echo "SUBMENU|$repo_name|Open \"$repo_name\"|Check In \"$repo_name\""
             fi
         done
     fi
@@ -488,6 +552,11 @@ display_navbar_menu() {
     echo "----"
     echo "DISABLED|$APP_NAME Version $VERSION"
     echo "Setup"
+    
+    # Add cleanup submenu at the top (if there are removable repositories)
+    if has_removable_repos; then
+        display_cleanup_submenu
+    fi
     
     # Add offload submenu at the bottom
     display_offload_submenu

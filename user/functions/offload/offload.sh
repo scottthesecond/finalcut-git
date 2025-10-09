@@ -94,7 +94,7 @@ generate_filename_with_original() {
         # Sanitize original filename for use in parentheses (remove special chars, limit length)
         local sanitized_original=$(echo "$original_filename" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]//g' | cut -c1-20)
         if [ -n "$sanitized_original" ]; then
-            echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).(${sanitized_original}).${extension}"
+            echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter)(${sanitized_original}).${extension}"
         else
             echo "${type_prefix}$(printf "%04d" $counter).${project_shortname}.${source_name}.$(printf "%04d" $file_counter).${extension}"
         fi
@@ -114,9 +114,7 @@ scan_input_directory() {
     local file_counter=1
     local skipped_count=0
     local ignore_file_src="$input_path/.ignore"
-    local ignore_file_dest="$output_path/.ignore"
     > "$ignore_file_src"
-    > "$ignore_file_dest"
     
     log_message "Scanning input directory: $input_path"
     show_details "Scanning input directory for files..."
@@ -141,7 +139,6 @@ scan_input_directory() {
             ((skipped_count++))
             log_message "Skipping $file_path: $skip_reason"
             echo "$file_path|$skip_reason" >> "$ignore_file_src"
-            echo "$file_path|$skip_reason" >> "$ignore_file_dest"
             continue
         fi
         
@@ -161,11 +158,12 @@ scan_input_directory() {
             dest_path="$dest_dir/$new_filename"
         else
             # Flat structure
-            dest_path="$output_path/$new_filename"
+            # Normalize path to avoid double slashes
+            dest_path=$(echo "$output_path/$new_filename" | sed 's|//*|/|g')
         fi
         
-        # Add to offload file
-        echo "$file_path|$dest_path|$new_filename|queued" >> "$offload_file"
+        # Add to offload file with unified format: source_file|dest_file|new_filename|status|source_size|dest_size|source_hash|dest_hash
+        echo "$file_path|$dest_path|$new_filename|queued|0|0||" >> "$offload_file"
         
         log_message "Queued: $file_path -> $dest_path"
         ((file_counter++))
@@ -180,18 +178,31 @@ scan_input_directory() {
 copy_files() {
     local offload_file="$1"
     local output_path="$2"
+    local input_path="$3"
     local total_files=$(wc -l < "$offload_file")
     local current_file=0
     
-    # Create destination offload file for filename mappings
-    local dest_offload_file="$output_path/.offload"
+    # Create destination directory
+    mkdir -p "$output_path"
+    
+    # Create destination offload file (same format as source)
+    # Normalize path to avoid double slashes
+    local dest_offload_file=$(echo "$output_path/.offload" | sed 's|//*|/|g')
     > "$dest_offload_file"
+    
+    # Create destination ignore file by copying from source if it exists
+    local ignore_file_src="$input_path/.ignore"
+    local ignore_file_dest=$(echo "$output_path/.ignore" | sed 's|//*|/|g')
+    if [ -f "$ignore_file_src" ]; then
+        cp "$ignore_file_src" "$ignore_file_dest"
+        log_message "Created destination ignore file: $ignore_file_dest"
+    fi
     
     log_message "Starting file copy process for $total_files files"
     show_details "Starting file copy process..."
     show_details "Copying $total_files files..."
     
-    while IFS='|' read -r source_path dest_path new_filename status; do
+    while IFS='|' read -r source_path dest_path new_filename status source_size dest_size source_hash dest_hash; do
         ((current_file++))
         
         if [ "$status" = "queued" ] || [ "$status" = "unverified" ]; then
@@ -202,18 +213,19 @@ copy_files() {
             log_message "Copying file $current_file/$total_files: $source_path"
             show_details "Transferring file $current_file/$total_files"
             
-            # Copy the file
-            if cp "$source_path" "$dest_path"; then
+            # Copy the file and capture any error output
+            local copy_output
+            if copy_output=$(cp "$source_path" "$dest_path" 2>&1); then
                 # Update status to unverified
                 sed -i '' "${current_file}s/$status$/unverified/" "$offload_file"
                 
-                # Add mapping to destination offload file
-                echo "$new_filename|$(basename "$source_path")" >> "$dest_offload_file"
+                # Add same entry to destination offload file
+                echo "$source_path|$dest_path|$new_filename|unverified|$source_size|$dest_size|$source_hash|$dest_hash" >> "$dest_offload_file"
                 
                 log_message "Successfully copied: $new_filename"
                 show_details "✓ Copied: $new_filename"
             else
-                log_message "ERROR: Failed to copy $source_path"
+                log_message "ERROR: Failed to copy $source_path: $copy_output"
                 show_details "✗ Failed to copy: $(basename "$source_path")"
                 # Update status to failed
                 sed -i '' "${current_file}s/$status$/failed/" "$offload_file"
@@ -241,7 +253,7 @@ check_offload_status() {
         return
     fi
     
-    # Count files by status
+    # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
     while IFS='|' read -r source_path dest_path new_filename status; do
         ((total_files++))
         case "$status" in
@@ -251,8 +263,11 @@ check_offload_status() {
             "failed")
                 ((failed_files++))
                 ;;
-            "queued"|"unverified")
+            "queued")
                 ((queued_files++))
+                ;;
+            "unverified")
+                ((completed_files++))
                 ;;
         esac
     done < "$offload_file"
@@ -284,7 +299,7 @@ get_offload_stats() {
         return
     fi
     
-    # Count files by status
+    # Count files by status (unified format: source_file|dest_file|new_filename|status|...)
     while IFS='|' read -r source_path dest_path new_filename status; do
         ((total_files++))
         case "$status" in
@@ -294,8 +309,11 @@ get_offload_stats() {
             "failed")
                 ((failed_files++))
                 ;;
-            "queued"|"unverified")
+            "queued")
                 ((queued_files++))
+                ;;
+            "unverified")
+                ((completed_files++))
                 ;;
         esac
     done < "$offload_file"
@@ -382,7 +400,7 @@ resume_offload() {
     show_details "Resuming: $queued_files files remaining"
     
     # Copy remaining files
-    copy_files "$offload_file" "$actual_output_path"
+    copy_files "$offload_file" "$actual_output_path" "$input_path"
     
     # Display summary
     local final_stats=$(get_offload_stats "$offload_file")
@@ -448,7 +466,7 @@ retry_failed_offload() {
     sed -i '' 's/failed$/queued/g' "$offload_file"
     
     # Copy files (this will retry the failed ones)
-    copy_files "$offload_file" "$actual_output_path"
+    copy_files "$offload_file" "$actual_output_path" "$input_path"
     
     # Display summary
     local final_stats=$(get_offload_stats "$offload_file")
@@ -598,9 +616,13 @@ offload() {
         fi
         
         # If we get here, either status was "none" or user chose "Start New Offload"
-        log_message "Backing up existing .offload file to .offload.backup"
-        show_details "Backing up existing offload file..."
-        cp "$offload_file" "$offload_file.backup"
+        # Only create backup if we're actually doing a resume/retry operation
+        # For new offloads, we don't need a backup
+        if [ "$status" != "none" ]; then
+            log_message "Backing up existing .offload file to .offload.backup"
+            show_details "Backing up existing offload file..."
+            cp "$offload_file" "$offload_file.backup"
+        fi
     fi
     
     # Clear/create offload file
@@ -612,27 +634,27 @@ offload() {
     scan_input_directory "$input_path" "$project_shortname" "$source_name" "$type" "$offload_file" "$counter"
     
     # Copy files and update status
-    copy_files "$offload_file" "$output_path"
+    copy_files "$offload_file" "$output_path" "$input_path"
     
-    # Display summary
+    # Display summary - count successfully copied files (unverified status means copied but not yet verified)
     local total_files=$(wc -l < "$offload_file")
-    local unverified_count=$(grep -c "unverified" "$offload_file" 2>/dev/null || echo "0")
+    local copied_count=$(grep -c "unverified" "$offload_file" 2>/dev/null || echo "0")
     local failed_count=$(grep -c "failed" "$offload_file" 2>/dev/null || echo "0")
     
     show_progress 100
     show_details "Offload complete!"
     show_details "Total files: $total_files"
-    show_details "Successfully copied: $unverified_count"
+    show_details "Successfully copied: $copied_count"
     if [ "$failed_count" -gt 0 ] 2>/dev/null; then
         show_details "Failed: $failed_count"
     fi
     
     log_message "Offload complete!"
     log_message "Total files: $total_files"
-    log_message "Successfully copied: $unverified_count"
+    log_message "Successfully copied: $copied_count"
     if [ "$failed_count" -gt 0 ] 2>/dev/null; then
         log_message "Failed: $failed_count"
     fi
     
-    echo "Offload complete! $unverified_count files copied to $output_path"
+    echo "Offload complete! $copied_count files copied to $output_path"
 } 
