@@ -1,0 +1,32 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+README*.md
+*.md
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Logs
+*.log
+
+# SSH keys (will be mounted at runtime)
+ssh_keys/
+
+# Docker files (except what we need)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Backup files
+*.backup
+*.bak 
