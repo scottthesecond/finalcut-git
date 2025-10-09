@@ -2,7 +2,7 @@ enable_auto_checkpoint() {
     log_message "(BEGIN ENABLE_AUTO_CHECKPOINT)"
     
     # Only run in statusbar mode (when no other mode flags are set)
-    if [ "$navbar" = true ] || [ "$progressbar" = true ] || [ "$droplet" = true ]; then
+    if [ "$navbar" != true ]; then
         log_message "Skipping enable_auto_checkpoint - not in statusbar mode (navbar=$navbar, progressbar=$progressbar, droplet=$droplet)"
         return 0
     fi
