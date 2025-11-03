@@ -39,6 +39,17 @@ checkin() {
         select_repo "Which repository do you want to check in?"
     fi
 
+    # Check and update remote URL if needed
+    local repo_path="$CHECKEDOUT_FOLDER/$selected_repo"
+    log_message "Checking remote URL for repository: $selected_repo"
+    if ! check_remote_url_matches "$selected_repo" "$repo_path"; then
+        log_message "Remote URL mismatch detected, updating..."
+        show_details "Updating repository remote URL..."
+        if ! update_remote_url "$selected_repo" "$repo_path"; then
+            log_message "Warning: Failed to update remote URL, continuing anyway"
+        fi
+    fi
+
     show_progress 30
     show_details "Getting commit message..."
 

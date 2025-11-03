@@ -78,6 +78,17 @@ prepare_repo_for_checkout() {
         return $RC_ERROR
     fi
     
+    # Check and update remote URL if needed
+    local repo_name=$(basename "$repo_path")
+    log_message "Checking remote URL for repository: $repo_name"
+    if ! check_remote_url_matches "$repo_name" "$repo_path"; then
+        log_message "Remote URL mismatch detected, updating..."
+        show_details "Updating repository remote URL..."
+        if ! update_remote_url "$repo_name" "$repo_path"; then
+            log_message "Warning: Failed to update remote URL, continuing anyway"
+        fi
+    fi
+    
     # Handle any pending changes
     log_message "Checking for pending changes..."
     show_details "Checking for pending changes..."

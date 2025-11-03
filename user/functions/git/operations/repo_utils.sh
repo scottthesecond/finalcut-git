@@ -184,4 +184,159 @@ has_repos() {
     else
         return $RC_ERROR
     fi
+}
+
+# Function to get the expected remote URL for a repository based on current config
+# Parameters:
+#   $1: repo_name - Name of the repository
+# Returns:
+#   Expected remote URL string
+get_expected_remote_url() {
+    local repo_name="$1"
+    
+    # Build the expected URL from current config
+    echo "ssh://git@$SERVER_ADDRESS:$SERVER_PORT/$SERVER_PATH/$repo_name.git"
+}
+
+# Function to check if repository remote URL matches current config
+# Parameters:
+#   $1: repo_name - Name of the repository
+#   $2: repo_path - Path to the repository directory
+# Returns:
+#   0: Remote URL matches current config
+#   1: Remote URL does not match (or error)
+check_remote_url_matches() {
+    local repo_name="$1"
+    local repo_path="$2"
+    
+    # Validate inputs
+    if [ -z "$repo_name" ] || [ -z "$repo_path" ]; then
+        log_message "Error: Missing required parameters in check_remote_url_matches"
+        return 1
+    fi
+    
+    # Change to repository directory
+    if ! cd "$repo_path"; then
+        log_message "Error: Failed to change to repository directory: $repo_path"
+        return 1
+    fi
+    
+    # Get current remote URL
+    local current_url=$(git remote get-url origin 2>&1)
+    local git_status=$?
+    
+    if [ $git_status -ne 0 ]; then
+        log_message "Error: Failed to get remote URL for $repo_name: $current_url"
+        return 1
+    fi
+    
+    # Get expected remote URL
+    local expected_url=$(get_expected_remote_url "$repo_name")
+    
+    # Compare URLs
+    if [ "$current_url" = "$expected_url" ]; then
+        log_message "Repository $repo_name remote URL matches: $expected_url"
+        return 0
+    else
+        log_message "Repository $repo_name remote URL mismatch:"
+        log_message "  Current:  $current_url"
+        log_message "  Expected: $expected_url"
+        return 1
+    fi
+}
+
+# Function to add SSH host key to known_hosts automatically
+# Parameters:
+#   $1: server_address - Server address to add
+#   $2: server_port - Server port (default: 22)
+# Returns:
+#   0: Success or already exists
+#   1: Error
+add_ssh_host_key() {
+    local server_address="$1"
+    local server_port="${2:-22}"
+    
+    # Validate inputs
+    if [ -z "$server_address" ]; then
+        log_message "Error: Missing required server address in add_ssh_host_key"
+        return 1
+    fi
+    
+    # Ensure .ssh directory exists
+    if [ ! -d "$HOME/.ssh" ]; then
+        mkdir -p "$HOME/.ssh"
+        chmod 700 "$HOME/.ssh"
+    fi
+    
+    # Ensure known_hosts exists
+    if [ ! -f "$HOME/.ssh/known_hosts" ]; then
+        touch "$HOME/.ssh/known_hosts"
+        chmod 600 "$HOME/.ssh/known_hosts"
+    fi
+    
+    # Check if host key already exists
+    if ssh-keygen -F "[$server_address]:$server_port" >/dev/null 2>&1 || \
+       ssh-keygen -F "$server_address:$server_port" >/dev/null 2>&1; then
+        log_message "SSH host key for [$server_address]:$server_port already exists"
+        return 0
+    fi
+    
+    # Add host key using ssh-keyscan
+    log_message "Adding SSH host key for [$server_address]:$server_port"
+    local keyscan_output=$(ssh-keyscan -p "$server_port" "$server_address" 2>&1)
+    local keyscan_status=$?
+    
+    if [ $keyscan_status -eq 0 ]; then
+        echo "$keyscan_output" >> "$HOME/.ssh/known_hosts"
+        chmod 600 "$HOME/.ssh/known_hosts"
+        log_message "Successfully added SSH host key for [$server_address]:$server_port"
+        return 0
+    else
+        log_message "Warning: Failed to scan SSH host key for [$server_address]:$server_port: $keyscan_output"
+        # Don't fail - the connection might still work if the user accepts it manually
+        return 0
+    fi
+}
+
+# Function to update repository remote URL to match current config
+# Parameters:
+#   $1: repo_name - Name of the repository
+#   $2: repo_path - Path to the repository directory
+# Returns:
+#   0: Success
+#   1: Error
+update_remote_url() {
+    local repo_name="$1"
+    local repo_path="$2"
+    
+    # Validate inputs
+    if [ -z "$repo_name" ] || [ -z "$repo_path" ]; then
+        log_message "Error: Missing required parameters in update_remote_url"
+        return 1
+    fi
+    
+    # Add SSH host key to known_hosts if it's not already there
+    log_message "Ensuring SSH host key for $SERVER_ADDRESS:$SERVER_PORT is in known_hosts"
+    add_ssh_host_key "$SERVER_ADDRESS" "$SERVER_PORT"
+    
+    # Change to repository directory
+    if ! cd "$repo_path"; then
+        log_message "Error: Failed to change to repository directory: $repo_path"
+        return 1
+    fi
+    
+    # Get expected remote URL
+    local expected_url=$(get_expected_remote_url "$repo_name")
+    
+    # Update remote URL
+    local update_output=$(git remote set-url origin "$expected_url" 2>&1)
+    local git_status=$?
+    
+    if [ $git_status -ne 0 ]; then
+        log_message "Error: Failed to update remote URL for $repo_name: $update_output"
+        return 1
+    fi
+    
+    log_message "Updated repository $repo_name remote URL to: $expected_url"
+    return 0
 } 
