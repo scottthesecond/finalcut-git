@@ -16,7 +16,8 @@ services:
     volumes:
       - git_repositories:/home/git/repositories
       - ./ssh_keys:/home/git/.ssh:ro
-    
+     # - /Applications/unflab/ssh_keys:/etc/ssh/keys:ro # Uncomment this to use/persist a pre-defined ssh_key 
+
     # Environment variables
     environment:
       - GIT_USER=git

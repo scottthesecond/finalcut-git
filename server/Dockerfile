@@ -4,6 +4,8 @@ FROM ubuntu:22.04
 ENV GIT_USER=git
 ENV REPO_PATH=/home/git/repositories
 ENV SSH_PORT=22
+ARG GIT_UID=1000
+ARG GIT_GID=1000
 
 # Install required packages
 RUN apt-get update && apt-get install -y \
@@ -13,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create git & group
+
 RUN groupadd -g ${GIT_GID} git || true && \
     useradd -m -u ${GIT_UID} -g ${GIT_GID} -s /bin/bash git
 
@@ -21,6 +24,10 @@ RUN mkdir -p /home/git/.ssh && \
     chown -R git:git /home/git/.ssh && \
     chmod 700 /home/git/.ssh && \
     mkdir -p /var/run/sshd
+
+# Use persisted host keys
+# RUN sed -i '/^HostKey/d' /etc/ssh/sshd_config && \
+#     echo 'HostKey /etc/ssh/keys/ssh_host_ed25519_key' >> /etc/ssh/sshd_config
 
 # Configure SSH server
 RUN sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && \
