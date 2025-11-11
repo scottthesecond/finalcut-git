@@ -12,9 +12,9 @@ RUN apt-get update && apt-get install -y \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Create git user
-RUN useradd -m -s /bin/bash git && \
-    echo 'git:gitpass' | chpasswd
+# Create git & group
+RUN groupadd -g ${GIT_GID} git || true && \
+    useradd -m -u ${GIT_UID} -g ${GIT_GID} -s /bin/bash git \
 
 # Setup SSH directory and configuration
 RUN mkdir -p /home/git/.ssh && \
@@ -42,6 +42,12 @@ COPY add-user.sh /home/git/scripts/
 COPY inspect-repos.sh /home/git/scripts/
 COPY update-gitignore.sh /home/git/scripts/
 COPY gitignore-template /home/git/scripts/
+
+# Container-wide git defaults
+RUN git config --system init.defaultBranch main && \
+    git config --system user.name  "UNF Automations" && \
+    git config --system user.email "ops@unnamedfilms.com"
+
 
 # Make scripts executable
 RUN chmod +x /home/git/scripts/*.sh && \
