@@ -49,7 +49,7 @@ RUN git config --system init.defaultBranch main && \
     git config --system user.email "technology@unnamedco.com"
 
     #Scripts
-COPY create-repo.sh add-user.sh inspect-repos.sh update-gitignore.sh gitignore-template /home/git/scripts/
+COPY ./scripts/ /home/git/scripts/
 RUN chmod +x /home/git/scripts/*.sh && chown -R git:git /home/git/scripts
 
 
