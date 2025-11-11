@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 
 # Create git & group
 RUN groupadd -g ${GIT_GID} git || true && \
-    useradd -m -u ${GIT_UID} -g ${GIT_GID} -s /bin/bash git \
+    useradd -m -u ${GIT_UID} -g ${GIT_GID} -s /bin/bash git
 
 # Setup SSH directory and configuration
 RUN mkdir -p /home/git/.ssh && \
@@ -23,12 +23,12 @@ RUN mkdir -p /home/git/.ssh && \
     mkdir -p /var/run/sshd
 
 # Configure SSH server
-RUN echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config && \
-    echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && \
-    echo 'AuthorizedKeysFile .ssh/authorized_keys' >> /etc/ssh/sshd_config && \
-    echo 'PermitRootLogin no' >> /etc/ssh/sshd_config
+RUN sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+    sed -i 's/#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    grep -q '^PubkeyAuthentication yes' /etc/ssh/sshd_config || echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && \
+    grep -q '^AuthorizedKeysFile .ssh/authorized_keys' /etc/ssh/sshd_config || echo 'AuthorizedKeysFile .ssh/authorized_keys' >> /etc/ssh/sshd_config
 
-# Create repositories directory
+    # Create repositories directory
 RUN mkdir -p /home/git/repositories && \
     chown -R git:git /home/git/repositories
 
@@ -36,25 +36,19 @@ RUN mkdir -p /home/git/repositories && \
 RUN mkdir -p /home/git/scripts && \
     chown -R git:git /home/git/scripts
 
-# Copy server scripts to the container
-COPY create-repo.sh /home/git/scripts/
-COPY add-user.sh /home/git/scripts/
-COPY inspect-repos.sh /home/git/scripts/
-COPY update-gitignore.sh /home/git/scripts/
-COPY gitignore-template /home/git/scripts/
-
-# Container-wide git defaults
+    # Git defaults
 RUN git config --system init.defaultBranch main && \
-    git config --system user.name  "UNF Automations" && \
-    git config --system user.email "ops@unnamedfilms.com"
+    git config --system user.name "UNF Automations" && \
+    git config --system user.email "technology@unnamedco.com"
+
+    #Scripts
+COPY create-repo.sh add-user.sh inspect-repos.sh update-gitignore.sh gitignore-template /home/git/scripts/
+RUN chmod +x /home/git/scripts/*.sh && chown -R git:git /home/git/scripts
 
 
-# Make scripts executable
-RUN chmod +x /home/git/scripts/*.sh && \
-    chown -R git:git /home/git/scripts
 
 # Expose SSH port
-EXPOSE 22
+EXPOSE ${SSH_PORT}
 
 # Start SSH server
 CMD ["/usr/sbin/sshd", "-D"] 
