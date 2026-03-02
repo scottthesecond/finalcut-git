@@ -269,6 +269,24 @@ while [[ "$1" != "" ]]; do
       parameter="Set Checked In Folder"
       ;;
       
+    # Motion Templates operations
+    "Enable Motion Templates")
+      script="templates_ui"
+      parameter="enable"
+      ;;
+    "Pull Templates")
+      script="templates_ui"
+      parameter="sync"
+      ;;
+    "Push Template Changes")
+      script="templates_ui"
+      parameter="push"
+      ;;
+    "Add Template Folder...")
+      script="templates_ui"
+      parameter="add_folder"
+      ;;
+
     # Offload menu operations
     "Set Destination")
       script="offload_ui"
@@ -530,12 +548,22 @@ if [ -n "$script" ]; then
     "setup_ui")
       log_message "preparing for setup UI script"
       log_message "Parameter value: '$parameter'"
-      
+
       # Parse setup UI parameters
       if [ -n "$parameter" ]; then
         handle_setup_menu "$parameter" || handle_error "Failed to handle setup menu"
       else
         handle_error "Setup UI requires parameters: menu_item"
+      fi
+      ;;
+    "templates_ui")
+      log_message "preparing for templates UI script"
+      log_message "Parameter value: '$parameter'"
+
+      if [ -n "$parameter" ]; then
+        handle_templates_menu "$parameter" || handle_error "Failed to handle templates menu"
+      else
+        handle_error "Templates UI requires a parameter: enable|sync|push|add_folder"
       fi
       ;;
     *)
@@ -612,6 +640,9 @@ display_navbar_menu() {
     
     # Add offload submenu at the bottom
     display_offload_submenu
+
+    # Add Motion Templates submenu
+    display_templates_submenu
 }
 
 # Handle navbar mode display

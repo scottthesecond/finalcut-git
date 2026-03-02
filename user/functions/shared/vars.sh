@@ -10,6 +10,13 @@ LOG_FILE="$LOGS_FOLDER/fcpgit-$VERSION-$(date +'%Y-%m-%d').log"
 REMOVABLE_FILE="$DATA_FOLDER/.removable"
 selected_repo=""
 
+# Motion Templates sync variables
+TEMPLATES_GIT_DIR="$HOME/.unflab/.templates/.git"
+TEMPLATES_WORK_TREE="$HOME/Movies/Motion Templates.localized"
+TEMPLATES_SYNC_INCLUDE="$TEMPLATES_WORK_TREE/.sync-include"
+TEMPLATES_GITIGNORE="$TEMPLATES_WORK_TREE/.gitignore"
+TEMPLATES_REPO_NAME="${TEMPLATES_REPO_NAME:-motion-templates}"
+
 CURRENT_USER=$(whoami)
 
 # Return code constants

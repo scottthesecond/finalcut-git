@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.0.1"
+VERSION="3.1.0"
 NAME="UNFlab"
 
 # Default values
@@ -87,6 +87,8 @@ scripts=(
     "$FUNCTIONS/offload/offload.sh"
     "$FUNCTIONS/offload/offload_ui.sh"
     "$FUNCTIONS/offload/verify.sh"
+    "$FUNCTIONS/templates/templates.sh"
+    "$FUNCTIONS/templates/templates_ui.sh"
     "$FUNCTIONS/shared/_main.sh"
 )
 
