@@ -2,6 +2,28 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Repair the local pieces that setup() normally makes, on every run.
+# A Mac can have a .config without them (setup cut short, or .config copied
+# from another Mac), and then checkout fails at the clone, commit, or move.
+ensure_local_setup() {
+	mkdir -p "$CHECKEDOUT_FOLDER" "$CHECKEDIN_FOLDER" "$BACKUPS_FOLDER"
+
+	# git refuses to commit with no identity. Supply one for UNFlab's own
+	# commits only, so the user's git config is left alone.
+	if [ -z "$(git config user.name)" ]; then
+		local full_name
+		full_name=$(id -F 2>/dev/null)
+		export GIT_AUTHOR_NAME="${full_name:-$CURRENT_USER}"
+		export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+		log_message "No git user.name set, committing as '$GIT_AUTHOR_NAME'"
+	fi
+	if [ -z "$(git config user.email)" ]; then
+		export GIT_AUTHOR_EMAIL="$CURRENT_USER@$(hostname -s)"
+		export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+		log_message "No git user.email set, committing as '$GIT_AUTHOR_EMAIL'"
+	fi
+}
+
 setup() {
 	CONFIRM=$(osascript -e 'display dialog "Set up UNFlab?" buttons {"Yes", "No"} default button "Yes"' -e 'button returned of result')
 	if [ "$CONFIRM" == "No" ]; then

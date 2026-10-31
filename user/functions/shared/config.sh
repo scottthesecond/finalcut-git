@@ -66,3 +66,4 @@ if [ -f "$CONFIG_FILE" ]; then
 else
     setup
 fi
+ensure_local_setup

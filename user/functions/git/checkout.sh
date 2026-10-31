@@ -247,6 +247,7 @@ checkout() {
             clone_status=$?
             if [ $clone_status -ne 0 ]; then
                 show_details_on
+                log_message "git clone output: $clone_output"
                 show_details "Git clone failed: $clone_output"
                 show_git_output "$clone_output" "clone"
                 cancel_checkout "Git clone failed for $selected_repo"

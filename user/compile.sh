@@ -4,7 +4,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PARENT_DIR=$(dirname "$SCRIPT_DIR")
 FUNCTIONS="$SCRIPT_DIR/functions"
-VERSION="3.1.0"
+VERSION="3.1.1"
 NAME="UNFlab"
 
 # Default values
@@ -179,6 +179,22 @@ if [ "$build_with_platypus" = true ]; then
         rm -rf "$APPLICATIONS_DIR/$OUT_APP"
     fi
 
+    # macOS blocks LAN connections from apps that have no Local Network
+    # permission, and git.unnamedfilms.com is a LAN address in the office.
+    # Without NSLocalNetworkUsageDescription macOS never asks, it just blocks
+    # ("connect to host ... Undefined error: 0"). Platypus signs every app as
+    # "ScriptExec", so re-sign each with its bundle ID to keep the permissions
+    # of UNFlab, UNFlab Progress and UNFlab Offload apart.
+    allow_local_network() {
+        local app="$1"
+        local plist="$app/Contents/Info.plist"
+        /usr/libexec/PlistBuddy -c "Delete :NSLocalNetworkUsageDescription" "$plist" 2>/dev/null
+        /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'UNFlab connects to the Unnamed Films git server on the office network to check projects in and out.'" "$plist"
+        local bundle_id
+        bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist")
+        codesign --force --sign - --identifier "$bundle_id" "$app"
+    }
+
     # Build the progress bar app with Platypus (using same script)
     echo "Building progress bar app..."
     progress_out_app="$progress_app_name.app"
@@ -212,7 +228,11 @@ if [ "$build_with_platypus" = true ]; then
         --bundled-file "$output_file"\
         "$SCRIPT_DIR/build/fcp-git-user.sh"\
         "$SCRIPT_DIR/build/$droplet_out_app"
-    
+
+    # Before they are bundled into the main app, which seals them in its signature
+    allow_local_network "$SCRIPT_DIR/build/$progress_out_app"
+    allow_local_network "$SCRIPT_DIR/build/$droplet_out_app"
+
     # Build the status menu app with Platypus (including progress app and droplet as bundled files)
     echo "Building status menu app with bundled progress app and droplet..."
     /usr/local/bin/platypus \
@@ -235,7 +255,9 @@ if [ "$build_with_platypus" = true ]; then
         --bundled-file "$SCRIPT_DIR/build/$droplet_out_app"\
         "$SCRIPT_DIR/build/fcp-git-user.sh"\
         "$SCRIPT_DIR/build/$OUT_APP"
-  
+
+    allow_local_network "$SCRIPT_DIR/build/$OUT_APP"
+
     cd "$SCRIPT_DIR/build"
     zip -r "$OUT_ZIP" "$OUT_APP"
 

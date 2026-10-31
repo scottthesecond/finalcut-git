@@ -37,8 +37,14 @@ launch_progress_app() {
     # Check if the app exists
     if [ -d "$progress_app_path" ]; then
         log_message "Progress app found at bundled location"
-        log_message "Attempting to launch: open -n '$progress_app_path' --args '$operation' '$repo_name' '$additional_param'"
-        open -n "$progress_app_path" --args "$operation" "$repo_name" "$additional_param"
+        # Run the binary as our child, not with `open`. macOS Local Network
+        # privacy charges a child's connections to the app that launched it
+        # (UNFlab, which has the permission). An app started with `open` is
+        # judged on its own, and macOS blocks the git server without asking.
+        local progress_bin="$progress_app_path/Contents/MacOS/UNFlab Progress"
+        log_message "Attempting to launch: '$progress_bin' '$operation' '$repo_name' '$additional_param'"
+        "$progress_bin" "$operation" "$repo_name" "$additional_param" >/dev/null 2>&1 &
+        disown
         log_message "Launch command completed"
     else
         log_message "Progress app not found at bundled location, trying Applications folder"
